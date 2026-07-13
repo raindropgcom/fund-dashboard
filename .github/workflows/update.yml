@@ -1,0 +1,39 @@
+name: Update Fund Dashboard
+
+on:
+  schedule:
+    # 北京时间 9:00–15:59 工作日（UTC+8 → UTC 1-7），覆盖盘中估值 + 盘后净值更新
+    # 已收紧到交易时段，私有仓库也能在免费额度(2000分钟/月)内跑完
+    - cron: '*/20 1-7 * * 1-5'
+  workflow_dispatch:   # 在 Actions 页面手动点一下即可运行，方便首次测试
+
+permissions:
+  contents: write    # 需要写权限，才能把生成的 HTML 推送到 gh-pages 分支
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # --once 单次模式不需要 apscheduler；也不用 coscmd（纯 GitHub Pages 方案）
+          pip install requests pandas openpyxl lxml
+
+      - name: Generate dashboard (one-shot)
+        run: python fund_dashboard_trade.py --once
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./fund_code        # HTML 实际在 fund_code/fund_dashboard.html
+          publish_branch: gh-pages

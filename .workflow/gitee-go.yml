@@ -1,0 +1,60 @@
+# Gitee Go 国内 CI 备胎工作流
+# 用途：当 GitHub Actions（境外服务器）抓不到东方财富数据时，用 Gitee（国内服务器）抓取，
+#       生成 HTML 后推回 GitHub 的 gh-pages 分支。手机访问的 GitHub Pages 网址保持不变。
+#
+# 配置步骤（首次使用需手动）：
+#   1. 在 Gitee 新建仓库 fund-dashboard，并把 GitHub 仓库代码 mirror 过去（git push --mirror）
+#   2. Gitee 仓库 → 设置 → Gitee Go → 开启，并选择本文件（.workflow/gitee-go.yml）作为流水线
+#   3. 在 Gitee 仓库 → 设置 → 私密变量(Secrets) 里新增：
+#        GH_TOKEN = 一个有「repo 写权限」的 GitHub Personal Access Token（用于推回 GitHub Pages）
+#   4. 在 Gitee Go 控制台启用「定时触发」（YAML 里的 schedule 有时需在控制台单独开启）
+#   5. 把下面两处「你的Gitee名 / 你的GitHub名」改成你实际的用户名
+#
+# 注意：Gitee Go 的 runner 镜像与 GitHub 略有差异；若 runs-on 报错，请在 Gitee Go 控制台
+#       选择一个可用的云构建环境（Python 3.x）。
+
+version: '1.0'
+name: 基金看板-国内CI备胎
+on:
+  schedule:
+    # 北京时间 9:00–15:59 工作日（UTC+8 → UTC 1-7）
+    - cron: '*/20 1-7 * * 1-5'
+
+jobs:
+  build:
+    name: 国内抓取并部署
+    runs-on: ubuntu-latest
+    steps:
+      - name: 安装依赖
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install requests pandas openpyxl lxml
+
+      - name: 检出 Gitee 仓库代码
+        run: |
+          rm -rf src
+          git clone https://gitee.com/你的Gitee名/fund-dashboard.git src
+
+      - name: 生成看板（单次模式）
+        run: |
+          cd src
+          python3 fund_dashboard_trade.py --once
+
+      - name: 推送到 GitHub Pages（gh-pages 分支）
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          set -e
+          rm -rf gh
+          git clone --depth 1 https://$GH_TOKEN@github.com/你的GitHub名/fund-dashboard.git gh || true
+          cd gh
+          # 若 gh-pages 不存在则创建孤立分支
+          git checkout --orphan gh-pages 2>/dev/null || git checkout gh-pages
+          # 清空旧内容（保留 .git）
+          find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+          cp ../src/fund_code/fund_dashboard.html .
+          git config user.email "bot@local"
+          git config user.name "fund-bot"
+          git add -A
+          git commit -m "deploy $(date +%F_%T)" || echo "no change"
+          git push -f origin gh-pages

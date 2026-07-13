@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Excel 临时锁文件
+~$*.xlsx
+
+# 根目录零散数据/中间产物（仅排除根级，不碰 trades/ 与 fund_code/）
+/_*.json
+/_calc_mirr.py
+/*.xlsx
+/*.html
+/文字格式.txt
+/_deprecated/
+/归档/
+/基金流水/
+
+# 生成产物（由工作流重新生成，不必入库）
+/fund_code/fund_dashboard.html
+/fund_code/fund_dashboard.xlsx
