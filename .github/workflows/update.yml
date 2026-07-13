@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # --once 单次模式不需要 apscheduler；也不用 coscmd（纯 GitHub Pages 方案）
-          pip install requests pandas openpyxl lxml
+          # --once 单次模式虽不启调度器，但脚本顶部仍 import apscheduler，必须安装
+          pip install requests pandas openpyxl lxml apscheduler
 
       - name: Generate dashboard (one-shot)
         run: python fund_dashboard_trade.py --once
