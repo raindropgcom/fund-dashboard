@@ -1,0 +1,2442 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="20">
+    <title>基金实时估值 Dashboard - 交易记录版</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f5f6fa;
+            margin: 20px;
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .info {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .trade-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+        .stat-buy { color: #e74c3c; }
+        .stat-sell { color: #27ae60; }
+        .controls {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .controls button {
+            margin: 0 4px;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            background: #34495e;
+            color: white;
+        }
+        .controls button:hover {
+            background: #2c3e50;
+        }
+        .controls button.buy-sort {
+            background: #e74c3c;
+        }
+        .controls button.buy-sort:hover {
+            background: #c0392b;
+        }
+        .controls button.sell-sort {
+            background: #27ae60;
+        }
+        .controls button.sell-sort:hover {
+            background: #1e8449;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 13px;
+        }
+        th {
+            background: #34495e;
+            color: white;
+            padding: 10px 6px;
+            text-align: center;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background: #2c3e50;
+        }
+        th::after {
+            content: " ⇅";
+            font-size: 11px;
+            color: #bdc3c7;
+        }
+        td {
+            padding: 8px 6px;
+            text-align: center;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        tr.has-trade {
+            background: #fff8e1 !important;
+            border-left: 3px solid #f39c12;
+        }
+        tr.has-trade td {
+            border-bottom: 1px solid #f0e6c8;
+        }
+        .code {
+            font-family: Consolas, monospace;
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        .name {
+            text-align: left;
+            font-weight: 500;
+            min-width: 220px;
+            position: relative;
+        }
+        .name-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 200px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .time {
+            font-size: 11px;
+            color: #95a5a6;
+        }
+        .red {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        .green {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        .black {
+            color: #2c3e50;
+        }
+        .trade-badges {
+            display: inline-block;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+        .trade-badge {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            border-radius: 50%;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 3px;
+        }
+        .trade-badge.buy {
+            background: #e74c3c;
+        }
+        .trade-badge.sell {
+            background: #27ae60;
+        }
+        .trade-line {
+            font-size: 11px;
+            margin-top: 3px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            width: fit-content;
+            line-height: 1.4;
+        }
+        .buy-line {
+            background: #fdeaea;
+            color: #c0392b;
+        }
+        .sell-line {
+            background: #e8f8f5;
+            color: #27ae60;
+        }
+        .trade-line .shares {
+            color: #666;
+            font-weight: normal;
+        }
+        .trade-line .nav {
+            color: #999;
+            font-weight: normal;
+            font-size: 10px;
+        }
+        /* 隐藏排序列 */
+        .sort-col {
+            display: none;
+        }
+        th.sort-col {
+            display: none;
+        }
+        .summary {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <h2>基金实时估值 Dashboard</h2>
+    <div class="info">
+        更新时间：2026-07-13 08:34:35 | 
+        <span id="refresh-countdown">20</span> 秒后自动刷新
+    </div>
+    
+        <div class="trade-stats">
+            <div class="stat-item">
+                <div class="stat-value stat-buy">6,800.00</div>
+                <div class="stat-label">买入金额（元）</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value stat-sell">0.00</div>
+                <div class="stat-label">卖出金额（元）</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">23</div>
+                <div class="stat-label">交易基金数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" style="font-size:16px;">2026-07-10</div>
+                <div class="stat-label">交易日期</div>
+            </div>
+        </div>
+        
+    <div class="controls">
+        <button onclick="sortTable(4, 'desc')">当天涨跌 ↓</button>
+        <button onclick="sortTable(4, 'asc')">当天涨跌 ↑</button>
+        <button onclick="sortTable(5, 'desc')">7日合计 ↓</button>
+        <button onclick="sortTable(5, 'asc')">7日合计 ↑</button>
+        <button class="buy-sort" onclick="sortTable(7, 'desc')">买入金额 ↓</button>
+        <button class="sell-sort" onclick="sortTable(8, 'desc')">卖出金额 ↓</button>
+        <button onclick="location.reload()">刷新数据</button>
+    </div>
+    <table id="fundTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0, 'asc')">基金代码</th>
+                <th onclick="sortTable(1, 'asc')">基金名称</th>
+                <th onclick="sortTable(2, 'asc')">昨日净值</th>
+                <th onclick="sortTable(3, 'asc')">实时估值</th>
+                <th onclick="sortTable(4, 'desc')">当天估算涨跌</th>
+                <th onclick="sortTable(5, 'desc')">前7日合计涨幅</th>
+                <th onclick="sortTable(6, 'asc')">估值时间</th>
+                <th class="sort-col" onclick="sortTable(7, 'desc')">买入金额</th>
+                <th class="sort-col" onclick="sortTable(8, 'desc')">卖出金额</th>
+                <th>2026-07-10</th><th>2026-07-09</th><th>2026-07-08</th><th>2026-07-07</th><th>2026-07-06</th><th>2026-07-03</th><th>2026-07-02</th>
+            </tr>
+        </thead>
+        <tbody>
+            
+        <tr >
+            <td class="code">007491</td>
+            <td class="name">
+                <div class="name-text">南方信息创新混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.9434</td>
+            <td>5.7425</td>
+            <td class="green" data-sort="-3.38"><b>-3.38%</b></td>
+            <td class="green" data-sort="-4.41"><b>-4.41%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.71">-6.71%</td><td class="red" data-sort="7.77">+7.77%</td><td class="red" data-sort="3.0">+3.00%</td><td class="red" data-sort="0.88">+0.88%</td><td class="red" data-sort="2.57">+2.57%</td><td class="green" data-sort="-1.76">-1.76%</td><td class="green" data-sort="-10.16">-10.16%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">020227</td>
+            <td class="name">
+                <div class="name-text">国泰中证全指集成电路ETF发起联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>100.00元</b> <span class='shares'>(35.98份)</span> <span class='nav'>@净值2.7791</span></div>
+            </td>
+            <td>2.7791</td>
+            <td>2.6429</td>
+            <td class="green" data-sort="-4.9"><b>-4.90%</b></td>
+            <td class="green" data-sort="-5.81"><b>-5.81%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="100.0">100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.66">-5.66%</td><td class="red" data-sort="7.71">+7.71%</td><td class="green" data-sort="-0.22">-0.22%</td><td class="green" data-sort="-0.89">-0.89%</td><td class="red" data-sort="0.92">+0.92%</td><td class="green" data-sort="-0.86">-0.86%</td><td class="green" data-sort="-6.81">-6.81%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">025209</td>
+            <td class="name">
+                <div class="name-text">永赢先锋半导体智选混合发起C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>100.00元</b> <span class='shares'>(33.69份)</span> <span class='nav'>@净值2.9679</span></div>
+            </td>
+            <td>2.9679</td>
+            <td>2.7734</td>
+            <td class="green" data-sort="-6.55"><b>-6.55%</b></td>
+            <td class="green" data-sort="-9.58"><b>-9.58%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="100.0">100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.84">-3.84%</td><td class="red" data-sort="4.19">+4.19%</td><td class="green" data-sort="-2.12">-2.12%</td><td class="green" data-sort="-3.84">-3.84%</td><td class="red" data-sort="0.48">+0.48%</td><td class="red" data-sort="1.75">+1.75%</td><td class="green" data-sort="-6.2">-6.20%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000595</td>
+            <td class="name">
+                <div class="name-text">嘉实泰和混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.1070</td>
+            <td>3.9598</td>
+            <td class="green" data-sort="-3.58"><b>-3.58%</b></td>
+            <td class="green" data-sort="-5.2"><b>-5.20%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.02">-5.02%</td><td class="red" data-sort="4.8">+4.80%</td><td class="green" data-sort="-0.53">-0.53%</td><td class="green" data-sort="-0.6">-0.60%</td><td class="green" data-sort="-0.69">-0.69%</td><td class="red" data-sort="0.57">+0.57%</td><td class="green" data-sort="-3.73">-3.73%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">017472</td>
+            <td class="name">
+                <div class="name-text">国泰中证机床ETF发起联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.4084</td>
+            <td>2.2418</td>
+            <td class="green" data-sort="-6.92"><b>-6.92%</b></td>
+            <td class="green" data-sort="-10.25"><b>-10.25%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.21">-1.21%</td><td class="red" data-sort="2.52">+2.52%</td><td class="green" data-sort="-5.23">-5.23%</td><td class="green" data-sort="-1.45">-1.45%</td><td class="green" data-sort="-3.41">-3.41%</td><td class="red" data-sort="1.36">+1.36%</td><td class="green" data-sort="-2.83">-2.83%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">006503</td>
+            <td class="name">
+                <div class="name-text">财通集成电路产业股票C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>100.00元</b> <span class='shares'>(12.85份)</span> <span class='nav'>@净值7.8130</span></div>
+            </td>
+            <td>7.8130</td>
+            <td>7.2586</td>
+            <td class="green" data-sort="-7.1"><b>-7.10%</b></td>
+            <td class="green" data-sort="-16.39"><b>-16.39%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="100.0">100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.38">-4.38%</td><td class="red" data-sort="5.03">+5.03%</td><td class="green" data-sort="-3.7">-3.70%</td><td class="green" data-sort="-0.44">-0.44%</td><td class="green" data-sort="-5.42">-5.42%</td><td class="red" data-sort="0.08">+0.08%</td><td class="green" data-sort="-7.56">-7.56%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">022365</td>
+            <td class="name">
+                <div class="name-text">永赢科技智选混合发起C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.6945</td>
+            <td>5.5701</td>
+            <td class="green" data-sort="-2.18"><b>-2.18%</b></td>
+            <td class="green" data-sort="-6.2"><b>-6.20%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.12">-4.12%</td><td class="red" data-sort="4.54">+4.54%</td><td class="green" data-sort="-0.74">-0.74%</td><td class="green" data-sort="-0.7">-0.70%</td><td class="green" data-sort="-0.82">-0.82%</td><td class="red" data-sort="1.49">+1.49%</td><td class="green" data-sort="-5.85">-5.85%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">023639</td>
+            <td class="name">
+                <div class="name-text">国泰A股电网设备ETF联接C</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>54.32份</b> <span class='nav'>(约100.71元)</span></div>
+            </td>
+            <td>1.8541</td>
+            <td>1.7672</td>
+            <td class="green" data-sort="-4.69"><b>-4.69%</b></td>
+            <td class="green" data-sort="-10.46"><b>-10.46%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="54.32">54.32</td>
+            <td class="green" data-sort="-0.81">-0.81%</td><td class="red" data-sort="1.55">+1.55%</td><td class="green" data-sort="-3.47">-3.47%</td><td class="green" data-sort="-3.28">-3.28%</td><td class="green" data-sort="-1.52">-1.52%</td><td class="red" data-sort="0.85">+0.85%</td><td class="green" data-sort="-3.78">-3.78%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">025833</td>
+            <td class="name">
+                <div class="name-text">天弘电网设备特高压指数C</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>80.17份</b> <span class='nav'>(约99.95元)</span></div>
+            </td>
+            <td>1.2467</td>
+            <td>1.1874</td>
+            <td class="green" data-sort="-4.76"><b>-4.76%</b></td>
+            <td class="green" data-sort="-11.45"><b>-11.45%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="80.17">80.17</td>
+            <td class="green" data-sort="-1.22">-1.22%</td><td class="red" data-sort="1.19">+1.19%</td><td class="green" data-sort="-3.37">-3.37%</td><td class="green" data-sort="-3.13">-3.13%</td><td class="green" data-sort="-1.65">-1.65%</td><td class="red" data-sort="0.56">+0.56%</td><td class="green" data-sort="-3.83">-3.83%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">017103</td>
+            <td class="name">
+                <div class="name-text">大摩数字经济混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.4426</td>
+            <td>4.2514</td>
+            <td class="green" data-sort="-4.3"><b>-4.30%</b></td>
+            <td class="green" data-sort="-7.32"><b>-7.32%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.63">-4.63%</td><td class="red" data-sort="6.83">+6.83%</td><td class="green" data-sort="-1.38">-1.38%</td><td class="green" data-sort="-0.11">-0.11%</td><td class="green" data-sort="-2.42">-2.42%</td><td class="red" data-sort="1.28">+1.28%</td><td class="green" data-sort="-6.89">-6.89%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">020900</td>
+            <td class="name">
+                <div class="name-text">天弘中证全指通信设备指数发起C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>500.00元</b> <span class='shares'>(127.10份)</span> <span class='nav'>@净值3.9340</span></div>
+            </td>
+            <td>3.9340</td>
+            <td>3.7432</td>
+            <td class="green" data-sort="-4.85"><b>-4.85%</b></td>
+            <td class="green" data-sort="-9.03"><b>-9.03%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="500.0">500.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.05">-3.05%</td><td class="red" data-sort="5.95">+5.95%</td><td class="green" data-sort="-0.59">-0.59%</td><td class="green" data-sort="-0.02">-0.02%</td><td class="green" data-sort="-3.5">-3.50%</td><td class="green" data-sort="-0.09">-0.09%</td><td class="green" data-sort="-7.73">-7.73%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001701</td>
+            <td class="name">
+                <div class="name-text">国联产业升级混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.1850</td>
+            <td>3.0014</td>
+            <td class="green" data-sort="-5.76"><b>-5.76%</b></td>
+            <td class="green" data-sort="-14.14"><b>-14.14%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.67">-4.67%</td><td class="red" data-sort="4.93">+4.93%</td><td class="green" data-sort="-3.69">-3.69%</td><td class="green" data-sort="-1.81">-1.81%</td><td class="green" data-sort="-5.24">-5.24%</td><td class="red" data-sort="2.22">+2.22%</td><td class="green" data-sort="-5.88">-5.88%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">010364</td>
+            <td class="name">
+                <div class="name-text">鹏华空天军工指数(LOF)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.0303</td>
+            <td>0.9684</td>
+            <td class="green" data-sort="-6.01"><b>-6.01%</b></td>
+            <td class="green" data-sort="-2.59"><b>-2.59%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.14">+2.14%</td><td class="red" data-sort="2.18">+2.18%</td><td class="green" data-sort="-2.39">-2.39%</td><td class="green" data-sort="-2.68">-2.68%</td><td class="green" data-sort="-2.05">-2.05%</td><td class="red" data-sort="2.8">+2.80%</td><td class="green" data-sort="-2.59">-2.59%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">011120</td>
+            <td class="name">
+                <div class="name-text">富国创新科技混合C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>50.00元</b> <span class='shares'>(9.98份)</span> <span class='nav'>@净值5.0110</span></div>
+            </td>
+            <td>5.0110</td>
+            <td>4.7601</td>
+            <td class="green" data-sort="-5.01"><b>-5.01%</b></td>
+            <td class="green" data-sort="-12.17"><b>-12.17%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="50.0">50.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.66">-4.66%</td><td class="red" data-sort="6.29">+6.29%</td><td class="green" data-sort="-1.61">-1.61%</td><td class="green" data-sort="-1.0">-1.00%</td><td class="green" data-sort="-4.44">-4.44%</td><td class="red" data-sort="0.04">+0.04%</td><td class="green" data-sort="-6.79">-6.79%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">025422</td>
+            <td class="name">
+                <div class="name-text">浦银安盛数字经济混合C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>500.00元</b> <span class='shares'>(225.15份)</span> <span class='nav'>@净值2.1911</span></div>
+            </td>
+            <td>2.1911</td>
+            <td>2.1119</td>
+            <td class="green" data-sort="-3.61"><b>-3.61%</b></td>
+            <td class="green" data-sort="-12.42"><b>-12.42%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="500.0">500.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.3">-3.30%</td><td class="red" data-sort="6.4">+6.40%</td><td class="green" data-sort="-2.41">-2.41%</td><td class="green" data-sort="-1.73">-1.73%</td><td class="green" data-sort="-3.52">-3.52%</td><td class="green" data-sort="-0.7">-0.70%</td><td class="green" data-sort="-7.16">-7.16%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">004409</td>
+            <td class="name">
+                <div class="name-text">招商深证TMT50ETF联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>300.00元</b> <span class='nav'>@净值4.0329</span></div>
+            </td>
+            <td>4.0329</td>
+            <td>3.8397</td>
+            <td class="green" data-sort="-4.79"><b>-4.79%</b></td>
+            <td class="green" data-sort="-6.16"><b>-6.16%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="300.0">300.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.46">-3.46%</td><td class="red" data-sort="5.92">+5.92%</td><td class="green" data-sort="-0.77">-0.77%</td><td class="green" data-sort="-0.73">-0.73%</td><td class="green" data-sort="-1.47">-1.47%</td><td class="red" data-sort="0.72">+0.72%</td><td class="green" data-sort="-6.37">-6.37%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">025491</td>
+            <td class="name">
+                <div class="name-text">平安中证卫星产业指数C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1509</td>
+            <td>1.0675</td>
+            <td class="green" data-sort="-7.25"><b>-7.25%</b></td>
+            <td class="red" data-sort="1.13"><b>+1.13%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="4.98">+4.98%</td><td class="red" data-sort="4.33">+4.33%</td><td class="green" data-sort="-1.94">-1.94%</td><td class="green" data-sort="-2.97">-2.97%</td><td class="green" data-sort="-3.04">-3.04%</td><td class="red" data-sort="3.39">+3.39%</td><td class="green" data-sort="-3.62">-3.62%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">003853</td>
+            <td class="name">
+                <div class="name-text">金鹰信息产业股票A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>6.6824</td>
+            <td>6.4310</td>
+            <td class="green" data-sort="-3.76"><b>-3.76%</b></td>
+            <td class="green" data-sort="-7.9"><b>-7.90%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.53">-5.53%</td><td class="red" data-sort="6.83">+6.83%</td><td class="red" data-sort="1.38">+1.38%</td><td class="red" data-sort="0.39">+0.39%</td><td class="green" data-sort="-0.86">-0.86%</td><td class="green" data-sort="-1.29">-1.29%</td><td class="green" data-sort="-8.82">-8.82%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005885</td>
+            <td class="name">
+                <div class="name-text">金鹰信息产业股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>6.5310</td>
+            <td>6.2853</td>
+            <td class="green" data-sort="-3.76"><b>-3.76%</b></td>
+            <td class="green" data-sort="-7.9"><b>-7.90%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.53">-5.53%</td><td class="red" data-sort="6.83">+6.83%</td><td class="red" data-sort="1.38">+1.38%</td><td class="red" data-sort="0.39">+0.39%</td><td class="green" data-sort="-0.86">-0.86%</td><td class="green" data-sort="-1.29">-1.29%</td><td class="green" data-sort="-8.82">-8.82%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">018185</td>
+            <td class="name">
+                <div class="name-text">万家先进制造混合发起式C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.2607</td>
+            <td>1.2028</td>
+            <td class="green" data-sort="-4.59"><b>-4.59%</b></td>
+            <td class="green" data-sort="-8.97"><b>-8.97%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.42">-1.42%</td><td class="red" data-sort="2.13">+2.13%</td><td class="green" data-sort="-2.89">-2.89%</td><td class="green" data-sort="-2.25">-2.25%</td><td class="green" data-sort="-1.99">-1.99%</td><td class="red" data-sort="1.45">+1.45%</td><td class="green" data-sort="-4.0">-4.00%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">164205</td>
+            <td class="name">
+                <div class="name-text">天弘文化新兴产业股票A</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>19.79份</b> <span class='nav'>(约100.51元)</span></div>
+            </td>
+            <td>5.0790</td>
+            <td>4.8487</td>
+            <td class="green" data-sort="-4.53"><b>-4.53%</b></td>
+            <td class="green" data-sort="-10.9"><b>-10.90%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="19.79">19.79</td>
+            <td class="green" data-sort="-6.46">-6.46%</td><td class="red" data-sort="7.27">+7.27%</td><td class="green" data-sort="-0.83">-0.83%</td><td class="green" data-sort="-0.87">-0.87%</td><td class="green" data-sort="-1.72">-1.72%</td><td class="red" data-sort="0.01">+0.01%</td><td class="green" data-sort="-8.3">-8.30%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">019548</td>
+            <td class="name">
+                <div class="name-text">招商纳斯达克100ETF发起式联接(QDII)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.5735</td>
+            <td>1.5784</td>
+            <td class="red" data-sort="0.31"><b>+0.31%</b></td>
+            <td class="green" data-sort="-1.75"><b>-1.75%</b></td>
+            <td class="time">2026-07-11 04:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.48">+1.48%</td><td class="red" data-sort="0.29">+0.29%</td><td class="green" data-sort="-1.66">-1.66%</td><td class="red" data-sort="1.19">+1.19%</td><td class="green" data-sort="-0.06">-0.06%</td><td class="green" data-sort="-1.46">-1.46%</td><td class="green" data-sort="-1.53">-1.53%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">025949</td>
+            <td class="name">
+                <div class="name-text">诺安研究精选股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.8490</td>
+            <td>2.6162</td>
+            <td class="green" data-sort="-8.17"><b>-8.17%</b></td>
+            <td class="red" data-sort="1.57"><b>+1.57%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="6.11">+6.11%</td><td class="red" data-sort="5.21">+5.21%</td><td class="green" data-sort="-3.84">-3.84%</td><td class="green" data-sort="-2.03">-2.03%</td><td class="green" data-sort="-5.64">-5.64%</td><td class="red" data-sort="5.05">+5.05%</td><td class="green" data-sort="-3.29">-3.29%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">320022</td>
+            <td class="name">
+                <div class="name-text">诺安研究精选股票A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.8560</td>
+            <td>2.6226</td>
+            <td class="green" data-sort="-8.17"><b>-8.17%</b></td>
+            <td class="red" data-sort="1.6"><b>+1.60%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="6.13">+6.13%</td><td class="red" data-sort="5.2">+5.20%</td><td class="green" data-sort="-3.83">-3.83%</td><td class="green" data-sort="-2.03">-2.03%</td><td class="green" data-sort="-5.63">-5.63%</td><td class="red" data-sort="5.04">+5.04%</td><td class="green" data-sort="-3.28">-3.28%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001630</td>
+            <td class="name">
+                <div class="name-text">天弘中证计算机ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.8686</td>
+            <td>0.8345</td>
+            <td class="green" data-sort="-3.93"><b>-3.93%</b></td>
+            <td class="red" data-sort="1.13"><b>+1.13%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.75">+0.75%</td><td class="red" data-sort="3.68">+3.68%</td><td class="red" data-sort="2.58">+2.58%</td><td class="green" data-sort="-2.55">-2.55%</td><td class="red" data-sort="0.35">+0.35%</td><td class="red" data-sort="0.44">+0.44%</td><td class="green" data-sort="-4.12">-4.12%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000136</td>
+            <td class="name">
+                <div class="name-text">民生加银策略精选混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.2833</td>
+            <td>5.1535</td>
+            <td class="green" data-sort="-2.46"><b>-2.46%</b></td>
+            <td class="green" data-sort="-2.32"><b>-2.32%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.82">-2.82%</td><td class="red" data-sort="4.55">+4.55%</td><td class="red" data-sort="0.19">+0.19%</td><td class="red" data-sort="0.26">+0.26%</td><td class="green" data-sort="-0.42">-0.42%</td><td class="red" data-sort="0.45">+0.45%</td><td class="green" data-sort="-4.53">-4.53%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">023519</td>
+            <td class="name">
+                <div class="name-text">国投瑞银上证科创板200指数发起式C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.8589</td>
+            <td>1.7536</td>
+            <td class="green" data-sort="-5.66"><b>-5.66%</b></td>
+            <td class="green" data-sort="-8.84"><b>-8.84%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.18">-3.18%</td><td class="red" data-sort="4.18">+4.18%</td><td class="green" data-sort="-1.61">-1.61%</td><td class="green" data-sort="-1.48">-1.48%</td><td class="green" data-sort="-1.62">-1.62%</td><td class="green" data-sort="-1.34">-1.34%</td><td class="green" data-sort="-3.79">-3.79%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">024751</td>
+            <td class="name">
+                <div class="name-text">兴业上证科创板人工智能指数C</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>44.11份</b> <span class='nav'>(约51.55元)</span></div>
+            </td>
+            <td>1.1687</td>
+            <td>1.1238</td>
+            <td class="green" data-sort="-3.84"><b>-3.84%</b></td>
+            <td class="green" data-sort="-4.1"><b>-4.10%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="44.11">44.11</td>
+            <td class="green" data-sort="-3.18">-3.18%</td><td class="red" data-sort="6.18">+6.18%</td><td class="red" data-sort="0.52">+0.52%</td><td class="green" data-sort="-0.24">-0.24%</td><td class="green" data-sort="-1.27">-1.27%</td><td class="red" data-sort="0.22">+0.22%</td><td class="green" data-sort="-6.33">-6.33%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">020256</td>
+            <td class="name">
+                <div class="name-text">中欧中证机器人指数发起C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.6916</td>
+            <td>1.5931</td>
+            <td class="green" data-sort="-5.82"><b>-5.82%</b></td>
+            <td class="green" data-sort="-3.1"><b>-3.10%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.05">-0.05%</td><td class="red" data-sort="2.17">+2.17%</td><td class="green" data-sort="-4.29">-4.29%</td><td class="green" data-sort="-1.35">-1.35%</td><td class="green" data-sort="-3.56">-3.56%</td><td class="red" data-sort="5.88">+5.88%</td><td class="green" data-sort="-1.9">-1.90%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">026623</td>
+            <td class="name">
+                <div class="name-text">招商上证科创板芯片设计主题ETF发起式联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.3669</td>
+            <td>1.3007</td>
+            <td class="green" data-sort="-4.85"><b>-4.85%</b></td>
+            <td class="green" data-sort="-6.2"><b>-6.20%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.87">-5.87%</td><td class="red" data-sort="6.4">+6.40%</td><td class="red" data-sort="0.02">+0.02%</td><td class="green" data-sort="-1.0">-1.00%</td><td class="red" data-sort="0.81">+0.81%</td><td class="green" data-sort="-0.24">-0.24%</td><td class="green" data-sort="-6.32">-6.32%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005911</td>
+            <td class="name">
+                <div class="name-text">广发双擎升级混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.5063</td>
+            <td>2.4234</td>
+            <td class="green" data-sort="-3.31"><b>-3.31%</b></td>
+            <td class="green" data-sort="-9.78"><b>-9.78%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.15">-6.15%</td><td class="red" data-sort="7.19">+7.19%</td><td class="green" data-sort="-1.07">-1.07%</td><td class="red" data-sort="0.07">+0.07%</td><td class="green" data-sort="-2.33">-2.33%</td><td class="red" data-sort="0.05">+0.05%</td><td class="green" data-sort="-7.54">-7.54%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000263</td>
+            <td class="name">
+                <div class="name-text">工银信息产业混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.8690</td>
+            <td>5.6504</td>
+            <td class="green" data-sort="-3.73"><b>-3.73%</b></td>
+            <td class="green" data-sort="-9.28"><b>-9.28%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.71">-4.71%</td><td class="red" data-sort="5.28">+5.28%</td><td class="green" data-sort="-0.83">-0.83%</td><td class="green" data-sort="-0.29">-0.29%</td><td class="green" data-sort="-2.04">-2.04%</td><td class="red" data-sort="0.8">+0.80%</td><td class="green" data-sort="-7.49">-7.49%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">011474</td>
+            <td class="name">
+                <div class="name-text">工银信息产业混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.7130</td>
+            <td>5.5002</td>
+            <td class="green" data-sort="-3.73"><b>-3.73%</b></td>
+            <td class="green" data-sort="-9.28"><b>-9.28%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.72">-4.72%</td><td class="red" data-sort="5.29">+5.29%</td><td class="green" data-sort="-0.84">-0.84%</td><td class="green" data-sort="-0.28">-0.28%</td><td class="green" data-sort="-2.04">-2.04%</td><td class="red" data-sort="0.81">+0.81%</td><td class="green" data-sort="-7.5">-7.50%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">519126</td>
+            <td class="name">
+                <div class="name-text">浦银安盛新经济结构混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.9889</td>
+            <td>2.8589</td>
+            <td class="green" data-sort="-4.35"><b>-4.35%</b></td>
+            <td class="green" data-sort="-10.81"><b>-10.81%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.69">-5.69%</td><td class="red" data-sort="8.01">+8.01%</td><td class="red" data-sort="0.28">+0.28%</td><td class="green" data-sort="-0.97">-0.97%</td><td class="green" data-sort="-3.04">-3.04%</td><td class="green" data-sort="-0.11">-0.11%</td><td class="green" data-sort="-9.29">-9.29%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">016531</td>
+            <td class="name">
+                <div class="name-text">鹏华碳中和主题混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.6765</td>
+            <td>1.5810</td>
+            <td class="green" data-sort="-5.7"><b>-5.70%</b></td>
+            <td class="green" data-sort="-4.49"><b>-4.49%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.87">+1.87%</td><td class="red" data-sort="0.61">+0.61%</td><td class="green" data-sort="-8.13">-8.13%</td><td class="green" data-sort="-3.15">-3.15%</td><td class="green" data-sort="-4.52">-4.52%</td><td class="red" data-sort="6.44">+6.44%</td><td class="red" data-sort="2.39">+2.39%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000043</td>
+            <td class="name">
+                <div class="name-text">嘉实美国成长股票人民币</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>6.3510</td>
+            <td>6.3682</td>
+            <td class="red" data-sort="0.27"><b>+0.27%</b></td>
+            <td class="green" data-sort="-2.06"><b>-2.06%</b></td>
+            <td class="time">2026-07-11 04:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.18">+1.18%</td><td class="red" data-sort="0.51">+0.51%</td><td class="green" data-sort="-1.7">-1.70%</td><td class="red" data-sort="1.53">+1.53%</td><td class="green" data-sort="-0.06">-0.06%</td><td class="green" data-sort="-1.79">-1.79%</td><td class="green" data-sort="-1.73">-1.73%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">019118</td>
+            <td class="name">
+                <div class="name-text">景顺长城纳斯达克科技ETF联接(QDII)E人民币</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.8384</td>
+            <td>2.8459</td>
+            <td class="red" data-sort="0.26"><b>+0.26%</b></td>
+            <td class="green" data-sort="-0.57"><b>-0.57%</b></td>
+            <td class="time">2026-07-11 04:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.54">+1.54%</td><td class="red" data-sort="0.74">+0.74%</td><td class="green" data-sort="-1.48">-1.48%</td><td class="red" data-sort="1.51">+1.51%</td><td class="green" data-sort="-0.06">-0.06%</td><td class="green" data-sort="-1.62">-1.62%</td><td class="green" data-sort="-1.2">-1.20%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">023896</td>
+            <td class="name">
+                <div class="name-text">天弘上证科创板综合指数增强C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.0257</td>
+            <td>1.9418</td>
+            <td class="green" data-sort="-4.14"><b>-4.14%</b></td>
+            <td class="green" data-sort="-4.9"><b>-4.90%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.09">-4.09%</td><td class="red" data-sort="5.99">+5.99%</td><td class="green" data-sort="-0.57">-0.57%</td><td class="green" data-sort="-0.46">-0.46%</td><td class="green" data-sort="-0.62">-0.62%</td><td class="green" data-sort="-0.18">-0.18%</td><td class="green" data-sort="-4.97">-4.97%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">014162</td>
+            <td class="name">
+                <div class="name-text">万家人工智能混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.6933</td>
+            <td>4.5219</td>
+            <td class="green" data-sort="-3.65"><b>-3.65%</b></td>
+            <td class="green" data-sort="-9.6"><b>-9.60%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.57">-6.57%</td><td class="red" data-sort="6.27">+6.27%</td><td class="green" data-sort="-0.33">-0.33%</td><td class="red" data-sort="1.23">+1.23%</td><td class="green" data-sort="-1.45">-1.45%</td><td class="green" data-sort="-0.85">-0.85%</td><td class="green" data-sort="-7.9">-7.90%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">017470</td>
+            <td class="name">
+                <div class="name-text">嘉实上证科创板芯片ETF发起联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>1200.00元</b> <span class='shares'>(333.73份)</span> <span class='nav'>@净值3.5957</span></div>
+            </td>
+            <td>3.5957</td>
+            <td>3.4609</td>
+            <td class="green" data-sort="-3.75"><b>-3.75%</b></td>
+            <td class="green" data-sort="-4.33"><b>-4.33%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="1200.0">1200.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.57">-6.57%</td><td class="red" data-sort="8.36">+8.36%</td><td class="red" data-sort="1.16">+1.16%</td><td class="red" data-sort="0.43">+0.43%</td><td class="red" data-sort="1.01">+1.01%</td><td class="green" data-sort="-0.74">-0.74%</td><td class="green" data-sort="-7.98">-7.98%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">023829</td>
+            <td class="name">
+                <div class="name-text">万家中证半导体材料设备主题ETF发起式联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>1100.00元</b> <span class='shares'>(337.30份)</span> <span class='nav'>@净值3.2612</span></div>
+            </td>
+            <td>3.2612</td>
+            <td>3.1125</td>
+            <td class="green" data-sort="-4.56"><b>-4.56%</b></td>
+            <td class="green" data-sort="-6.49"><b>-6.49%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="1100.0">1100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.5">-6.50%</td><td class="red" data-sort="9.51">+9.51%</td><td class="red" data-sort="1.4">+1.40%</td><td class="red" data-sort="1.58">+1.58%</td><td class="green" data-sort="-0.96">-0.96%</td><td class="green" data-sort="-2.81">-2.81%</td><td class="green" data-sort="-8.71">-8.71%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">018124</td>
+            <td class="name">
+                <div class="name-text">永赢先进制造智选混合发起A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.1990</td>
+            <td>2.0779</td>
+            <td class="green" data-sort="-5.51"><b>-5.51%</b></td>
+            <td class="green" data-sort="-3.79"><b>-3.79%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.3">+1.30%</td><td class="red" data-sort="0.04">+0.04%</td><td class="green" data-sort="-8.47">-8.47%</td><td class="green" data-sort="-1.96">-1.96%</td><td class="green" data-sort="-4.51">-4.51%</td><td class="red" data-sort="7.68">+7.68%</td><td class="red" data-sort="2.13">+2.13%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">018125</td>
+            <td class="name">
+                <div class="name-text">永赢先进制造智选混合发起C</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>23.33份</b> <span class='nav'>(约50.66元)</span></div>
+            </td>
+            <td>2.1716</td>
+            <td>2.0520</td>
+            <td class="green" data-sort="-5.51"><b>-5.51%</b></td>
+            <td class="green" data-sort="-3.79"><b>-3.79%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="23.33">23.33</td>
+            <td class="red" data-sort="1.3">+1.30%</td><td class="red" data-sort="0.04">+0.04%</td><td class="green" data-sort="-8.47">-8.47%</td><td class="green" data-sort="-1.96">-1.96%</td><td class="green" data-sort="-4.51">-4.51%</td><td class="red" data-sort="7.68">+7.68%</td><td class="red" data-sort="2.13">+2.13%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">014642</td>
+            <td class="name">
+                <div class="name-text">摩根新兴动力混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>11.7484</td>
+            <td>11.4151</td>
+            <td class="green" data-sort="-2.84"><b>-2.84%</b></td>
+            <td class="green" data-sort="-10.22"><b>-10.22%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.63">-3.63%</td><td class="red" data-sort="2.11">+2.11%</td><td class="green" data-sort="-3.37">-3.37%</td><td class="green" data-sort="-0.65">-0.65%</td><td class="green" data-sort="-1.41">-1.41%</td><td class="red" data-sort="1.17">+1.17%</td><td class="green" data-sort="-4.44">-4.44%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">015897</td>
+            <td class="name">
+                <div class="name-text">天弘中证细分化工产业主题ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.8480</td>
+            <td>0.8148</td>
+            <td class="green" data-sort="-3.92"><b>-3.92%</b></td>
+            <td class="green" data-sort="-10.97"><b>-10.97%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.86">-1.86%</td><td class="green" data-sort="-0.56">-0.56%</td><td class="green" data-sort="-3.72">-3.72%</td><td class="green" data-sort="-2.76">-2.76%</td><td class="green" data-sort="-0.2">-0.20%</td><td class="green" data-sort="-1.23">-1.23%</td><td class="green" data-sort="-0.64">-0.64%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">020465</td>
+            <td class="name">
+                <div class="name-text">招商中证半导体产业ETF发起式联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>1100.00元</b> <span class='shares'>(242.39份)</span> <span class='nav'>@净值4.5379</span></div>
+            </td>
+            <td>4.5379</td>
+            <td>4.3705</td>
+            <td class="green" data-sort="-3.69"><b>-3.69%</b></td>
+            <td class="green" data-sort="-4.62"><b>-4.62%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="1100.0">1100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.53">-6.53%</td><td class="red" data-sort="9.33">+9.33%</td><td class="red" data-sort="1.85">+1.85%</td><td class="red" data-sort="1.31">+1.31%</td><td class="red" data-sort="0.12">+0.12%</td><td class="green" data-sort="-1.78">-1.78%</td><td class="green" data-sort="-8.92">-8.92%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">016269</td>
+            <td class="name">
+                <div class="name-text">建信改革红利股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>7.1050</td>
+            <td>6.8321</td>
+            <td class="green" data-sort="-3.84"><b>-3.84%</b></td>
+            <td class="green" data-sort="-9.59"><b>-9.59%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.14">-6.14%</td><td class="red" data-sort="5.86">+5.86%</td><td class="red" data-sort="0.82">+0.82%</td><td class="red" data-sort="0.27">+0.27%</td><td class="green" data-sort="-1.41">-1.41%</td><td class="green" data-sort="-0.94">-0.94%</td><td class="green" data-sort="-8.05">-8.05%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">017522</td>
+            <td class="name">
+                <div class="name-text">富国北证50成份指数C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>50.00元</b> <span class='shares'>(43.50份)</span> <span class='nav'>@净值1.1546</span></div>
+            </td>
+            <td>1.1546</td>
+            <td>1.0763</td>
+            <td class="green" data-sort="-6.78"><b>-6.78%</b></td>
+            <td class="green" data-sort="-4.19"><b>-4.19%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="50.0">50.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.01">-0.01%</td><td class="red" data-sort="0.46">+0.46%</td><td class="green" data-sort="-2.48">-2.48%</td><td class="green" data-sort="-0.76">-0.76%</td><td class="green" data-sort="-3.12">-3.12%</td><td class="red" data-sort="1.62">+1.62%</td><td class="red" data-sort="0.1">+0.10%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">020483</td>
+            <td class="name">
+                <div class="name-text">中欧中证芯片产业指数发起C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>1100.00元</b> <span class='shares'>(227.95份)</span> <span class='nav'>@净值3.9483</span></div>
+            </td>
+            <td>3.9483</td>
+            <td>3.7730</td>
+            <td class="green" data-sort="-4.44"><b>-4.44%</b></td>
+            <td class="green" data-sort="-5.9"><b>-5.90%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="1100.0">1100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.06">-6.06%</td><td class="red" data-sort="8.7">+8.70%</td><td class="red" data-sort="0.13">+0.13%</td><td class="green" data-sort="-0.43">-0.43%</td><td class="red" data-sort="0.99">+0.99%</td><td class="green" data-sort="-1.16">-1.16%</td><td class="green" data-sort="-8.07">-8.07%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">025333</td>
+            <td class="name">
+                <div class="name-text">诺安成长混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.9230</td>
+            <td>2.8331</td>
+            <td class="green" data-sort="-3.08"><b>-3.08%</b></td>
+            <td class="green" data-sort="-1.62"><b>-1.62%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.51">-4.51%</td><td class="red" data-sort="6.54">+6.54%</td><td class="red" data-sort="2.28">+2.28%</td><td class="red" data-sort="0.5">+0.50%</td><td class="red" data-sort="1.53">+1.53%</td><td class="green" data-sort="-1.47">-1.47%</td><td class="green" data-sort="-6.49">-6.49%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">320007</td>
+            <td class="name">
+                <div class="name-text">诺安成长混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.9350</td>
+            <td>2.8447</td>
+            <td class="green" data-sort="-3.08"><b>-3.08%</b></td>
+            <td class="green" data-sort="-1.58"><b>-1.58%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.46">-4.46%</td><td class="red" data-sort="6.52">+6.52%</td><td class="red" data-sort="2.27">+2.27%</td><td class="red" data-sort="0.53">+0.53%</td><td class="red" data-sort="1.52">+1.52%</td><td class="green" data-sort="-1.46">-1.46%</td><td class="green" data-sort="-6.5">-6.50%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">020065</td>
+            <td class="name">
+                <div class="name-text">西部利得科技创新混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.7401</td>
+            <td>1.6650</td>
+            <td class="green" data-sort="-4.31"><b>-4.31%</b></td>
+            <td class="green" data-sort="-14.38"><b>-14.38%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.01">-5.01%</td><td class="red" data-sort="5.25">+5.25%</td><td class="green" data-sort="-0.42">-0.42%</td><td class="green" data-sort="-1.68">-1.68%</td><td class="green" data-sort="-4.14">-4.14%</td><td class="red" data-sort="0.76">+0.76%</td><td class="green" data-sort="-9.14">-9.14%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001224</td>
+            <td class="name">
+                <div class="name-text">中邮新思路灵活配置混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.1060</td>
+            <td>3.9919</td>
+            <td class="green" data-sort="-2.78"><b>-2.78%</b></td>
+            <td class="green" data-sort="-14.71"><b>-14.71%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.91">-5.91%</td><td class="red" data-sort="6.46">+6.46%</td><td class="green" data-sort="-3.48">-3.48%</td><td class="green" data-sort="-1.03">-1.03%</td><td class="green" data-sort="-4.37">-4.37%</td><td class="red" data-sort="1.08">+1.08%</td><td class="green" data-sort="-7.46">-7.46%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001298</td>
+            <td class="name">
+                <div class="name-text">金鹰民族新兴混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.2528</td>
+            <td>2.1538</td>
+            <td class="green" data-sort="-4.39"><b>-4.39%</b></td>
+            <td class="green" data-sort="-4.41"><b>-4.41%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.17">+0.17%</td><td class="red" data-sort="2.34">+2.34%</td><td class="red" data-sort="0.02">+0.02%</td><td class="green" data-sort="-1.89">-1.89%</td><td class="green" data-sort="-1.93">-1.93%</td><td class="green" data-sort="-0.73">-0.73%</td><td class="green" data-sort="-2.39">-2.39%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">011613</td>
+            <td class="name">
+                <div class="name-text">华夏科创50ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.6020</td>
+            <td>1.5472</td>
+            <td class="green" data-sort="-3.42"><b>-3.42%</b></td>
+            <td class="green" data-sort="-3.37"><b>-3.37%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-5.36">-5.36%</td><td class="red" data-sort="8.14">+8.14%</td><td class="red" data-sort="0.68">+0.68%</td><td class="red" data-sort="0.26">+0.26%</td><td class="red" data-sort="0.95">+0.95%</td><td class="green" data-sort="-0.53">-0.53%</td><td class="green" data-sort="-7.51">-7.51%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">519767</td>
+            <td class="name">
+                <div class="name-text">交银科技创新灵活配置混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.3642</td>
+            <td>2.2901</td>
+            <td class="green" data-sort="-3.14"><b>-3.14%</b></td>
+            <td class="green" data-sort="-7.75"><b>-7.75%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.3">-0.30%</td><td class="green" data-sort="-0.36">-0.36%</td><td class="green" data-sort="-4.68">-4.68%</td><td class="green" data-sort="-2.06">-2.06%</td><td class="green" data-sort="-1.88">-1.88%</td><td class="red" data-sort="2.19">+2.19%</td><td class="green" data-sort="-0.66">-0.66%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">003494</td>
+            <td class="name">
+                <div class="name-text">富国天惠成长混合(LOF)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.0634</td>
+            <td>3.0032</td>
+            <td class="green" data-sort="-1.96"><b>-1.96%</b></td>
+            <td class="green" data-sort="-3.33"><b>-3.33%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.05">-3.05%</td><td class="red" data-sort="2.34">+2.34%</td><td class="green" data-sort="-1.77">-1.77%</td><td class="green" data-sort="-0.89">-0.89%</td><td class="red" data-sort="0.65">+0.65%</td><td class="red" data-sort="1.28">+1.28%</td><td class="green" data-sort="-1.89">-1.89%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001071</td>
+            <td class="name">
+                <div class="name-text">华安媒体互联网混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.4390</td>
+            <td>4.3464</td>
+            <td class="green" data-sort="-2.09"><b>-2.09%</b></td>
+            <td class="green" data-sort="-1.4"><b>-1.40%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.61">-2.61%</td><td class="red" data-sort="4.42">+4.42%</td><td class="red" data-sort="0.88">+0.88%</td><td class="green" data-sort="-0.12">-0.12%</td><td class="red" data-sort="0.05">+0.05%</td><td class="green" data-sort="-0.78">-0.78%</td><td class="green" data-sort="-3.24">-3.24%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">010310</td>
+            <td class="name">
+                <div class="name-text">德邦锐裕利率债债券C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1352</td>
+            <td>1.1352</td>
+            <td class="black" data-sort="0.0"><b>+0.00%</b></td>
+            <td class="red" data-sort="0.55"><b>+0.55%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.06">+0.06%</td><td class="red" data-sort="0.01">+0.01%</td><td class="red" data-sort="0.24">+0.24%</td><td class="red" data-sort="0.05">+0.05%</td><td class="red" data-sort="0.31">+0.31%</td><td class="green" data-sort="-0.18">-0.18%</td><td class="red" data-sort="0.06">+0.06%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">014143</td>
+            <td class="name">
+                <div class="name-text">银河创新成长混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>14.6814</td>
+            <td>14.1148</td>
+            <td class="green" data-sort="-3.86"><b>-3.86%</b></td>
+            <td class="green" data-sort="-3.52"><b>-3.52%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-7.29">-7.29%</td><td class="red" data-sort="8.61">+8.61%</td><td class="red" data-sort="1.57">+1.57%</td><td class="green" data-sort="-0.7">-0.70%</td><td class="red" data-sort="1.47">+1.47%</td><td class="green" data-sort="-0.54">-0.54%</td><td class="green" data-sort="-6.64">-6.64%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">021970</td>
+            <td class="name">
+                <div class="name-text">平安5-10年期政策性金融债债券E</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1654</td>
+            <td>1.1654</td>
+            <td class="black" data-sort="0.0"><b>+0.00%</b></td>
+            <td class="red" data-sort="0.25"><b>+0.25%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.01">+0.01%</td><td class="green" data-sort="-0.02">-0.02%</td><td class="red" data-sort="0.06">+0.06%</td><td class="red" data-sort="0.03">+0.03%</td><td class="red" data-sort="0.13">+0.13%</td><td class="green" data-sort="-0.03">-0.03%</td><td class="red" data-sort="0.07">+0.07%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">519674</td>
+            <td class="name">
+                <div class="name-text">银河创新成长混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>15.0917</td>
+            <td>14.5092</td>
+            <td class="green" data-sort="-3.86"><b>-3.86%</b></td>
+            <td class="green" data-sort="-3.5"><b>-3.50%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-7.28">-7.28%</td><td class="red" data-sort="8.61">+8.61%</td><td class="red" data-sort="1.57">+1.57%</td><td class="green" data-sort="-0.7">-0.70%</td><td class="red" data-sort="1.48">+1.48%</td><td class="green" data-sort="-0.54">-0.54%</td><td class="green" data-sort="-6.64">-6.64%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">020457</td>
+            <td class="name">
+                <div class="name-text">平安上证红利低波动指数C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.0320</td>
+            <td>1.0438</td>
+            <td class="red" data-sort="1.14"><b>+1.14%</b></td>
+            <td class="red" data-sort="2.95"><b>+2.95%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.65">+0.65%</td><td class="green" data-sort="-0.73">-0.73%</td><td class="red" data-sort="0.65">+0.65%</td><td class="green" data-sort="-0.68">-0.68%</td><td class="red" data-sort="1.97">+1.97%</td><td class="red" data-sort="0.5">+0.50%</td><td class="red" data-sort="0.59">+0.59%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">022486</td>
+            <td class="name">
+                <div class="name-text">国金中证A500指数增强C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.5172</td>
+            <td>1.4803</td>
+            <td class="green" data-sort="-2.43"><b>-2.43%</b></td>
+            <td class="green" data-sort="-4.89"><b>-4.89%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.6">-1.60%</td><td class="red" data-sort="3.11">+3.11%</td><td class="green" data-sort="-1.79">-1.79%</td><td class="green" data-sort="-1.49">-1.49%</td><td class="green" data-sort="-0.85">-0.85%</td><td class="red" data-sort="0.82">+0.82%</td><td class="green" data-sort="-3.09">-3.09%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">017838</td>
+            <td class="name">
+                <div class="name-text">博时中债7-10政金债指数C</div>
+                <div class="trade-badges"><span class="trade-badge sell">卖</span></div>
+                <div class="trade-line sell-line">卖出 <b>900.00份</b> <span class='nav'>(约1035.72元)</span></div>
+            </td>
+            <td>1.1508</td>
+            <td>1.1508</td>
+            <td class="black" data-sort="0.0"><b>+0.00%</b></td>
+            <td class="red" data-sort="0.21"><b>+0.21%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="900.0">900.00</td>
+            <td class="green" data-sort="-0.01">-0.01%</td><td class="black" data-sort="0.0">+0.00%</td><td class="red" data-sort="0.05">+0.05%</td><td class="red" data-sort="0.03">+0.03%</td><td class="red" data-sort="0.11">+0.11%</td><td class="green" data-sort="-0.03">-0.03%</td><td class="red" data-sort="0.06">+0.06%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">025163</td>
+            <td class="name">
+                <div class="name-text">长盛积极配置债券C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.5126</td>
+            <td>1.4691</td>
+            <td class="green" data-sort="-2.88"><b>-2.88%</b></td>
+            <td class="green" data-sort="-6.07"><b>-6.07%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.96">-2.96%</td><td class="red" data-sort="2.95">+2.95%</td><td class="green" data-sort="-0.62">-0.62%</td><td class="green" data-sort="-0.39">-0.39%</td><td class="green" data-sort="-1.04">-1.04%</td><td class="green" data-sort="-0.19">-0.19%</td><td class="green" data-sort="-3.82">-3.82%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">004253</td>
+            <td class="name">
+                <div class="name-text">国泰黄金ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.1663</td>
+            <td>3.1282</td>
+            <td class="green" data-sort="-1.2"><b>-1.20%</b></td>
+            <td class="red" data-sort="3.27"><b>+3.27%</b></td>
+            <td class="time">2026-07-13 15:30</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.11">-0.11%</td><td class="green" data-sort="-0.32">-0.32%</td><td class="green" data-sort="-0.16">-0.16%</td><td class="green" data-sort="-0.58">-0.58%</td><td class="green" data-sort="-0.32">-0.32%</td><td class="red" data-sort="2.67">+2.67%</td><td class="red" data-sort="2.09">+2.09%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">002671</td>
+            <td class="name">
+                <div class="name-text">万家沪深300指数增强C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.0199</td>
+            <td>1.9837</td>
+            <td class="green" data-sort="-1.79"><b>-1.79%</b></td>
+            <td class="green" data-sort="-3.1"><b>-3.10%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.81">-1.81%</td><td class="red" data-sort="2.69">+2.69%</td><td class="green" data-sort="-0.84">-0.84%</td><td class="green" data-sort="-1.06">-1.06%</td><td class="black" data-sort="0.0">+0.00%</td><td class="red" data-sort="0.95">+0.95%</td><td class="green" data-sort="-3.03">-3.03%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005918</td>
+            <td class="name">
+                <div class="name-text">天弘沪深300ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4919</td>
+            <td>1.4652</td>
+            <td class="green" data-sort="-1.79"><b>-1.79%</b></td>
+            <td class="green" data-sort="-3.22"><b>-3.22%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.74">-1.74%</td><td class="red" data-sort="2.41">+2.41%</td><td class="green" data-sort="-0.72">-0.72%</td><td class="green" data-sort="-0.97">-0.97%</td><td class="green" data-sort="-0.01">-0.01%</td><td class="red" data-sort="0.59">+0.59%</td><td class="green" data-sort="-2.78">-2.78%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">015642</td>
+            <td class="name">
+                <div class="name-text">银华数字经济股票发起式C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.9589</td>
+            <td>1.8495</td>
+            <td class="green" data-sort="-5.59"><b>-5.59%</b></td>
+            <td class="green" data-sort="-9.64"><b>-9.64%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.09">+1.09%</td><td class="red" data-sort="3.31">+3.31%</td><td class="green" data-sort="-3.99">-3.99%</td><td class="green" data-sort="-1.84">-1.84%</td><td class="green" data-sort="-4.6">-4.60%</td><td class="red" data-sort="2.22">+2.22%</td><td class="green" data-sort="-5.83">-5.83%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">019000</td>
+            <td class="name">
+                <div class="name-text">万家趋势领先混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.7464</td>
+            <td>1.7299</td>
+            <td class="green" data-sort="-0.95"><b>-0.95%</b></td>
+            <td class="red" data-sort="3.84"><b>+3.84%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.59">+0.59%</td><td class="green" data-sort="-0.96">-0.96%</td><td class="green" data-sort="-0.41">-0.41%</td><td class="green" data-sort="-2.0">-2.00%</td><td class="red" data-sort="1.96">+1.96%</td><td class="red" data-sort="3.33">+3.33%</td><td class="red" data-sort="1.33">+1.33%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">012709</td>
+            <td class="name">
+                <div class="name-text">东方红中证红利低波动指数C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.2774</td>
+            <td>1.2907</td>
+            <td class="red" data-sort="1.04"><b>+1.04%</b></td>
+            <td class="red" data-sort="2.09"><b>+2.09%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.11">+0.11%</td><td class="green" data-sort="-0.55">-0.55%</td><td class="red" data-sort="0.7">+0.70%</td><td class="green" data-sort="-0.88">-0.88%</td><td class="red" data-sort="1.53">+1.53%</td><td class="red" data-sort="0.34">+0.34%</td><td class="red" data-sort="0.84">+0.84%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001595</td>
+            <td class="name">
+                <div class="name-text">天弘中证银行ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.6369</td>
+            <td>1.6644</td>
+            <td class="red" data-sort="1.68"><b>+1.68%</b></td>
+            <td class="red" data-sort="3.69"><b>+3.69%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.61">+0.61%</td><td class="green" data-sort="-0.84">-0.84%</td><td class="red" data-sort="0.87">+0.87%</td><td class="red" data-sort="0.15">+0.15%</td><td class="red" data-sort="1.79">+1.79%</td><td class="green" data-sort="-0.05">-0.05%</td><td class="red" data-sort="1.16">+1.16%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">011103</td>
+            <td class="name">
+                <div class="name-text">天弘中证光伏产业指数C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.7615</td>
+            <td>0.7211</td>
+            <td class="green" data-sort="-5.3"><b>-5.30%</b></td>
+            <td class="green" data-sort="-12.3"><b>-12.30%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.7">-1.70%</td><td class="red" data-sort="1.72">+1.72%</td><td class="green" data-sort="-3.05">-3.05%</td><td class="green" data-sort="-1.01">-1.01%</td><td class="green" data-sort="-2.09">-2.09%</td><td class="green" data-sort="-1.43">-1.43%</td><td class="green" data-sort="-4.74">-4.74%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005661</td>
+            <td class="name">
+                <div class="name-text">嘉实资源精选股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>4.0951</td>
+            <td>4.0688</td>
+            <td class="green" data-sort="-0.64"><b>-0.64%</b></td>
+            <td class="red" data-sort="5.94"><b>+5.94%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.03">+3.03%</td><td class="green" data-sort="-1.14">-1.14%</td><td class="green" data-sort="-0.8">-0.80%</td><td class="green" data-sort="-2.49">-2.49%</td><td class="red" data-sort="0.63">+0.63%</td><td class="red" data-sort="4.8">+4.80%</td><td class="red" data-sort="1.91">+1.91%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005395</td>
+            <td class="name">
+                <div class="name-text">泓德臻远回报混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4339</td>
+            <td>1.3887</td>
+            <td class="green" data-sort="-3.15"><b>-3.15%</b></td>
+            <td class="green" data-sort="-7.54"><b>-7.54%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.81">-2.81%</td><td class="red" data-sort="1.48">+1.48%</td><td class="green" data-sort="-1.79">-1.79%</td><td class="green" data-sort="-1.18">-1.18%</td><td class="green" data-sort="-0.84">-0.84%</td><td class="red" data-sort="0.56">+0.56%</td><td class="green" data-sort="-2.96">-2.96%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">011261</td>
+            <td class="name">
+                <div class="name-text">金鹰新能源混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4147</td>
+            <td>1.3723</td>
+            <td class="green" data-sort="-3.0"><b>-3.00%</b></td>
+            <td class="green" data-sort="-13.51"><b>-13.51%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.51">-3.51%</td><td class="red" data-sort="1.59">+1.59%</td><td class="green" data-sort="-3.76">-3.76%</td><td class="green" data-sort="-2.07">-2.07%</td><td class="green" data-sort="-1.99">-1.99%</td><td class="red" data-sort="0.44">+0.44%</td><td class="green" data-sort="-4.21">-4.21%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">020741</td>
+            <td class="name">
+                <div class="name-text">华泰保兴安悦债券C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1483</td>
+            <td>1.1484</td>
+            <td class="red" data-sort="0.01"><b>+0.01%</b></td>
+            <td class="red" data-sort="0.52"><b>+0.52%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.06">+0.06%</td><td class="red" data-sort="0.04">+0.04%</td><td class="red" data-sort="0.21">+0.21%</td><td class="red" data-sort="0.07">+0.07%</td><td class="red" data-sort="0.27">+0.27%</td><td class="green" data-sort="-0.17">-0.17%</td><td class="red" data-sort="0.04">+0.04%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">001593</td>
+            <td class="name">
+                <div class="name-text">天弘创业板ETF联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>100.00元</b> <span class='shares'>(66.09份)</span> <span class='nav'>@净值1.5132</span></div>
+            </td>
+            <td>1.5132</td>
+            <td>1.4663</td>
+            <td class="green" data-sort="-3.1"><b>-3.10%</b></td>
+            <td class="green" data-sort="-9.37"><b>-9.37%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="100.0">100.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.12">-4.12%</td><td class="red" data-sort="4.25">+4.25%</td><td class="green" data-sort="-1.62">-1.62%</td><td class="green" data-sort="-0.88">-0.88%</td><td class="green" data-sort="-1.67">-1.67%</td><td class="red" data-sort="0.05">+0.05%</td><td class="green" data-sort="-5.38">-5.38%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">519697</td>
+            <td class="name">
+                <div class="name-text">交银优势行业混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>5.7570</td>
+            <td>5.6771</td>
+            <td class="green" data-sort="-1.39"><b>-1.39%</b></td>
+            <td class="green" data-sort="-1.93"><b>-1.93%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.76">-1.76%</td><td class="red" data-sort="1.88">+1.88%</td><td class="green" data-sort="-1.03">-1.03%</td><td class="green" data-sort="-0.48">-0.48%</td><td class="green" data-sort="-0.15">-0.15%</td><td class="red" data-sort="0.72">+0.72%</td><td class="green" data-sort="-1.11">-1.11%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">008929</td>
+            <td class="name">
+                <div class="name-text">宏利消费红利指数C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.2768</td>
+            <td>1.2765</td>
+            <td class="green" data-sort="-0.02"><b>-0.02%</b></td>
+            <td class="red" data-sort="0.91"><b>+0.91%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.69">+1.69%</td><td class="green" data-sort="-1.57">-1.57%</td><td class="red" data-sort="0.39">+0.39%</td><td class="green" data-sort="-1.75">-1.75%</td><td class="red" data-sort="0.69">+0.69%</td><td class="red" data-sort="0.87">+0.87%</td><td class="red" data-sort="0.59">+0.59%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">023573</td>
+            <td class="name">
+                <div class="name-text">万家中证港股通央企红利ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.0100</td>
+            <td>1.0119</td>
+            <td class="red" data-sort="0.19"><b>+0.19%</b></td>
+            <td class="red" data-sort="3.08"><b>+3.08%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.31">+0.31%</td><td class="green" data-sort="-1.13">-1.13%</td><td class="red" data-sort="2.04">+2.04%</td><td class="green" data-sort="-0.9">-0.90%</td><td class="red" data-sort="0.7">+0.70%</td><td class="red" data-sort="1.39">+1.39%</td><td class="red" data-sort="0.67">+0.67%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">050026</td>
+            <td class="name">
+                <div class="name-text">博时医疗保健行业混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.4910</td>
+            <td>2.4663</td>
+            <td class="green" data-sort="-0.99"><b>-0.99%</b></td>
+            <td class="red" data-sort="1.94"><b>+1.94%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.1">+3.10%</td><td class="red" data-sort="1.94">+1.94%</td><td class="green" data-sort="-2.15">-2.15%</td><td class="green" data-sort="-4.34">-4.34%</td><td class="red" data-sort="0.56">+0.56%</td><td class="red" data-sort="3.24">+3.24%</td><td class="green" data-sort="-0.41">-0.41%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001178</td>
+            <td class="name">
+                <div class="name-text">前海开源再融资股票</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4270</td>
+            <td>1.3716</td>
+            <td class="green" data-sort="-3.88"><b>-3.88%</b></td>
+            <td class="green" data-sort="-5.41"><b>-5.41%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.86">-1.86%</td><td class="red" data-sort="3.56">+3.56%</td><td class="green" data-sort="-2.3">-2.30%</td><td class="green" data-sort="-1.3">-1.30%</td><td class="green" data-sort="-0.48">-0.48%</td><td class="red" data-sort="0.55">+0.55%</td><td class="green" data-sort="-3.58">-3.58%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">017193</td>
+            <td class="name">
+                <div class="name-text">天弘中证工业有色金属主题ETF发起联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.6793</td>
+            <td>1.6097</td>
+            <td class="green" data-sort="-4.15"><b>-4.15%</b></td>
+            <td class="green" data-sort="-4.95"><b>-4.95%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.03">+1.03%</td><td class="green" data-sort="-0.26">-0.26%</td><td class="green" data-sort="-2.15">-2.15%</td><td class="green" data-sort="-2.95">-2.95%</td><td class="green" data-sort="-1.66">-1.66%</td><td class="red" data-sort="0.45">+0.45%</td><td class="red" data-sort="0.59">+0.59%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">018490</td>
+            <td class="name">
+                <div class="name-text">万家中证工业有色金属主题ETF发起式联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.5619</td>
+            <td>1.4971</td>
+            <td class="green" data-sort="-4.15"><b>-4.15%</b></td>
+            <td class="green" data-sort="-5.04"><b>-5.04%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.99">+0.99%</td><td class="green" data-sort="-0.26">-0.26%</td><td class="green" data-sort="-2.14">-2.14%</td><td class="green" data-sort="-2.94">-2.94%</td><td class="green" data-sort="-1.67">-1.67%</td><td class="red" data-sort="0.42">+0.42%</td><td class="red" data-sort="0.56">+0.56%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">019261</td>
+            <td class="name">
+                <div class="name-text">富国恒生红利ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1735</td>
+            <td>1.1789</td>
+            <td class="red" data-sort="0.46"><b>+0.46%</b></td>
+            <td class="red" data-sort="3.79"><b>+3.79%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.43">+0.43%</td><td class="green" data-sort="-0.79">-0.79%</td><td class="red" data-sort="1.64">+1.64%</td><td class="green" data-sort="-0.72">-0.72%</td><td class="red" data-sort="0.77">+0.77%</td><td class="red" data-sort="1.54">+1.54%</td><td class="red" data-sort="0.92">+0.92%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">006229</td>
+            <td class="name">
+                <div class="name-text">中欧医疗创新股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4696</td>
+            <td>1.4410</td>
+            <td class="green" data-sort="-1.94"><b>-1.94%</b></td>
+            <td class="red" data-sort="4.61"><b>+4.61%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.51">+3.51%</td><td class="red" data-sort="2.16">+2.16%</td><td class="green" data-sort="-2.5">-2.50%</td><td class="green" data-sort="-4.07">-4.07%</td><td class="red" data-sort="0.14">+0.14%</td><td class="red" data-sort="3.83">+3.83%</td><td class="red" data-sort="1.54">+1.54%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">013478</td>
+            <td class="name">
+                <div class="name-text">华宝中证金融科技主题ETF发起式联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.8123</td>
+            <td>0.7809</td>
+            <td class="green" data-sort="-3.87"><b>-3.87%</b></td>
+            <td class="green" data-sort="-6.56"><b>-6.56%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.05">-0.05%</td><td class="red" data-sort="1.57">+1.57%</td><td class="red" data-sort="0.24">+0.24%</td><td class="green" data-sort="-3.18">-3.18%</td><td class="green" data-sort="-1.81">-1.81%</td><td class="green" data-sort="-0.14">-0.14%</td><td class="green" data-sort="-3.19">-3.19%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005711</td>
+            <td class="name">
+                <div class="name-text">永赢惠添利灵活配置混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.2990</td>
+            <td>2.1968</td>
+            <td class="green" data-sort="-4.44"><b>-4.44%</b></td>
+            <td class="green" data-sort="-8.59"><b>-8.59%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-6.67">-6.67%</td><td class="red" data-sort="6.37">+6.37%</td><td class="green" data-sort="-0.73">-0.73%</td><td class="green" data-sort="-1.49">-1.49%</td><td class="green" data-sort="-0.58">-0.58%</td><td class="red" data-sort="0.68">+0.68%</td><td class="green" data-sort="-6.17">-6.17%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000251</td>
+            <td class="name">
+                <div class="name-text">工银金融地产混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.7010</td>
+            <td>2.7185</td>
+            <td class="red" data-sort="0.65"><b>+0.65%</b></td>
+            <td class="green" data-sort="-1.81"><b>-1.81%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.92">-0.92%</td><td class="red" data-sort="0.33">+0.33%</td><td class="green" data-sort="-0.51">-0.51%</td><td class="green" data-sort="-1.66">-1.66%</td><td class="red" data-sort="1.24">+1.24%</td><td class="red" data-sort="0.4">+0.40%</td><td class="green" data-sort="-0.69">-0.69%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">004997</td>
+            <td class="name">
+                <div class="name-text">广发高端制造股票A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.3989</td>
+            <td>1.3676</td>
+            <td class="green" data-sort="-2.24"><b>-2.24%</b></td>
+            <td class="green" data-sort="-4.93"><b>-4.93%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.33">-1.33%</td><td class="red" data-sort="0.8">+0.80%</td><td class="green" data-sort="-2.06">-2.06%</td><td class="green" data-sort="-1.09">-1.09%</td><td class="red" data-sort="0.53">+0.53%</td><td class="red" data-sort="0.33">+0.33%</td><td class="green" data-sort="-2.11">-2.11%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">010160</td>
+            <td class="name">
+                <div class="name-text">广发高端制造股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.3672</td>
+            <td>1.3366</td>
+            <td class="green" data-sort="-2.24"><b>-2.24%</b></td>
+            <td class="green" data-sort="-4.97"><b>-4.97%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.34">-1.34%</td><td class="red" data-sort="0.79">+0.79%</td><td class="green" data-sort="-2.07">-2.07%</td><td class="green" data-sort="-1.09">-1.09%</td><td class="red" data-sort="0.52">+0.52%</td><td class="red" data-sort="0.33">+0.33%</td><td class="green" data-sort="-2.11">-2.11%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001632</td>
+            <td class="name">
+                <div class="name-text">天弘中证食品饮料ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.7307</td>
+            <td>1.7238</td>
+            <td class="green" data-sort="-0.4"><b>-0.40%</b></td>
+            <td class="green" data-sort="-0.26"><b>-0.26%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="1.87">+1.87%</td><td class="green" data-sort="-1.15">-1.15%</td><td class="green" data-sort="-0.02">-0.02%</td><td class="green" data-sort="-1.93">-1.93%</td><td class="red" data-sort="0.93">+0.93%</td><td class="red" data-sort="0.29">+0.29%</td><td class="green" data-sort="-0.25">-0.25%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">003096</td>
+            <td class="name">
+                <div class="name-text">中欧医疗健康混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.8538</td>
+            <td>1.8246</td>
+            <td class="green" data-sort="-1.58"><b>-1.58%</b></td>
+            <td class="red" data-sort="1.35"><b>+1.35%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.85">+2.85%</td><td class="red" data-sort="2.8">+2.80%</td><td class="green" data-sort="-2.46">-2.46%</td><td class="green" data-sort="-4.22">-4.22%</td><td class="green" data-sort="-0.52">-0.52%</td><td class="red" data-sort="2.58">+2.58%</td><td class="red" data-sort="0.32">+0.32%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">005827</td>
+            <td class="name">
+                <div class="name-text">易方达蓝筹精选混合</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.5196</td>
+            <td>1.5072</td>
+            <td class="green" data-sort="-0.82"><b>-0.82%</b></td>
+            <td class="green" data-sort="-0.09"><b>-0.09%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.85">-0.85%</td><td class="red" data-sort="1.38">+1.38%</td><td class="red" data-sort="1.16">+1.16%</td><td class="green" data-sort="-0.52">-0.52%</td><td class="red" data-sort="0.22">+0.22%</td><td class="red" data-sort="0.64">+0.64%</td><td class="green" data-sort="-2.12">-2.12%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">016843</td>
+            <td class="name">
+                <div class="name-text">嘉实中证全指证券公司ETF发起联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1835</td>
+            <td>1.1723</td>
+            <td class="green" data-sort="-0.95"><b>-0.95%</b></td>
+            <td class="green" data-sort="-5.27"><b>-5.27%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.91">-1.91%</td><td class="red" data-sort="2.01">+2.01%</td><td class="green" data-sort="-1.24">-1.24%</td><td class="green" data-sort="-2.82">-2.82%</td><td class="red" data-sort="0.47">+0.47%</td><td class="red" data-sort="0.59">+0.59%</td><td class="green" data-sort="-2.37">-2.37%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001679</td>
+            <td class="name">
+                <div class="name-text">前海开源中国稀缺资产混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.7490</td>
+            <td>1.6794</td>
+            <td class="green" data-sort="-3.98"><b>-3.98%</b></td>
+            <td class="green" data-sort="-4.36"><b>-4.36%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.53">-4.53%</td><td class="red" data-sort="4.81">+4.81%</td><td class="green" data-sort="-0.63">-0.63%</td><td class="green" data-sort="-0.85">-0.85%</td><td class="red" data-sort="0.74">+0.74%</td><td class="red" data-sort="0.46">+0.46%</td><td class="green" data-sort="-4.36">-4.36%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">002079</td>
+            <td class="name">
+                <div class="name-text">前海开源中国稀缺资产混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.8210</td>
+            <td>1.7485</td>
+            <td class="green" data-sort="-3.98"><b>-3.98%</b></td>
+            <td class="green" data-sort="-4.4"><b>-4.40%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.51">-4.51%</td><td class="red" data-sort="4.78">+4.78%</td><td class="green" data-sort="-0.66">-0.66%</td><td class="green" data-sort="-0.81">-0.81%</td><td class="red" data-sort="0.76">+0.76%</td><td class="red" data-sort="0.44">+0.44%</td><td class="green" data-sort="-4.4">-4.40%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">003095</td>
+            <td class="name">
+                <div class="name-text">中欧医疗健康混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.9514</td>
+            <td>1.9206</td>
+            <td class="green" data-sort="-1.58"><b>-1.58%</b></td>
+            <td class="red" data-sort="1.37"><b>+1.37%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.85">+2.85%</td><td class="red" data-sort="2.81">+2.81%</td><td class="green" data-sort="-2.46">-2.46%</td><td class="green" data-sort="-4.22">-4.22%</td><td class="green" data-sort="-0.51">-0.51%</td><td class="red" data-sort="2.58">+2.58%</td><td class="red" data-sort="0.32">+0.32%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">260108</td>
+            <td class="name">
+                <div class="name-text">景顺长城新兴成长混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4490</td>
+            <td>1.4455</td>
+            <td class="green" data-sort="-0.24"><b>-0.24%</b></td>
+            <td class="green" data-sort="-0.39"><b>-0.39%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.56">+0.56%</td><td class="red" data-sort="0.07">+0.07%</td><td class="green" data-sort="-0.48">-0.48%</td><td class="green" data-sort="-1.36">-1.36%</td><td class="red" data-sort="0.96">+0.96%</td><td class="red" data-sort="0.41">+0.41%</td><td class="green" data-sort="-0.55">-0.55%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">110011</td>
+            <td class="name">
+                <div class="name-text">易方达优质精选混合(QDII)</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.9981</td>
+            <td>4.0040</td>
+            <td class="red" data-sort="0.15"><b>+0.15%</b></td>
+            <td class="red" data-sort="0.51"><b>+0.51%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.24">+0.24%</td><td class="green" data-sort="-0.4">-0.40%</td><td class="red" data-sort="1.69">+1.69%</td><td class="green" data-sort="-0.97">-0.97%</td><td class="red" data-sort="0.52">+0.52%</td><td class="red" data-sort="0.4">+0.40%</td><td class="green" data-sort="-0.97">-0.97%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">014674</td>
+            <td class="name">
+                <div class="name-text">富国中证港股通互联网ETF发起式联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.6633</td>
+            <td>0.6530</td>
+            <td class="green" data-sort="-1.56"><b>-1.56%</b></td>
+            <td class="red" data-sort="11.38"><b>+11.38%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.84">+0.84%</td><td class="green" data-sort="-1.75">-1.75%</td><td class="red" data-sort="6.56">+6.56%</td><td class="green" data-sort="-0.48">-0.48%</td><td class="red" data-sort="2.47">+2.47%</td><td class="red" data-sort="1.48">+1.48%</td><td class="red" data-sort="2.26">+2.26%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001875</td>
+            <td class="name">
+                <div class="name-text">前海开源沪港深优势精选混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.4550</td>
+            <td>1.4346</td>
+            <td class="green" data-sort="-1.4"><b>-1.40%</b></td>
+            <td class="green" data-sort="-0.44"><b>-0.44%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.51">-3.51%</td><td class="red" data-sort="3.57">+3.57%</td><td class="red" data-sort="0.14">+0.14%</td><td class="green" data-sort="-0.75">-0.75%</td><td class="red" data-sort="1.17">+1.17%</td><td class="red" data-sort="1.4">+1.40%</td><td class="green" data-sort="-2.46">-2.46%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">011871</td>
+            <td class="name">
+                <div class="name-text">前海开源沪港深优势精选混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.5770</td>
+            <td>0.5689</td>
+            <td class="green" data-sort="-1.4"><b>-1.40%</b></td>
+            <td class="green" data-sort="-0.53"><b>-0.53%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.51">-3.51%</td><td class="red" data-sort="3.46">+3.46%</td><td class="red" data-sort="0.17">+0.17%</td><td class="green" data-sort="-0.69">-0.69%</td><td class="red" data-sort="1.04">+1.04%</td><td class="red" data-sort="1.41">+1.41%</td><td class="green" data-sort="-2.41">-2.41%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">004851</td>
+            <td class="name">
+                <div class="name-text">广发医疗保健股票A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.9111</td>
+            <td>1.8820</td>
+            <td class="green" data-sort="-1.52"><b>-1.52%</b></td>
+            <td class="red" data-sort="0.42"><b>+0.42%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.32">+2.32%</td><td class="red" data-sort="2.54">+2.54%</td><td class="green" data-sort="-1.96">-1.96%</td><td class="green" data-sort="-4.27">-4.27%</td><td class="green" data-sort="-0.52">-0.52%</td><td class="red" data-sort="2.21">+2.21%</td><td class="red" data-sort="0.1">+0.10%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">010718</td>
+            <td class="name">
+                <div class="name-text">前海开源优质企业6个月持有混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.4914</td>
+            <td>0.4845</td>
+            <td class="green" data-sort="-1.41"><b>-1.41%</b></td>
+            <td class="green" data-sort="-0.49"><b>-0.49%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.51">-3.51%</td><td class="red" data-sort="3.56">+3.56%</td><td class="red" data-sort="0.12">+0.12%</td><td class="green" data-sort="-0.77">-0.77%</td><td class="red" data-sort="1.19">+1.19%</td><td class="red" data-sort="1.37">+1.37%</td><td class="green" data-sort="-2.45">-2.45%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">000831</td>
+            <td class="name">
+                <div class="name-text">工银医疗保健股票</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.1450</td>
+            <td>3.1161</td>
+            <td class="green" data-sort="-0.92"><b>-0.92%</b></td>
+            <td class="red" data-sort="2.59"><b>+2.59%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.91">+2.91%</td><td class="red" data-sort="2.55">+2.55%</td><td class="green" data-sort="-2.2">-2.20%</td><td class="green" data-sort="-4.03">-4.03%</td><td class="green" data-sort="-0.38">-0.38%</td><td class="red" data-sort="2.54">+2.54%</td><td class="red" data-sort="1.2">+1.20%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001102</td>
+            <td class="name">
+                <div class="name-text">前海开源国家比较优势混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.1730</td>
+            <td>2.0871</td>
+            <td class="green" data-sort="-3.95"><b>-3.95%</b></td>
+            <td class="green" data-sort="-4.36"><b>-4.36%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.53">-4.53%</td><td class="red" data-sort="4.79">+4.79%</td><td class="green" data-sort="-0.64">-0.64%</td><td class="green" data-sort="-0.82">-0.82%</td><td class="red" data-sort="0.78">+0.78%</td><td class="red" data-sort="0.41">+0.41%</td><td class="green" data-sort="-4.35">-4.35%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">012997</td>
+            <td class="name">
+                <div class="name-text">鹏华优选回报混合C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.5612</td>
+            <td>0.5567</td>
+            <td class="green" data-sort="-0.8"><b>-0.80%</b></td>
+            <td class="red" data-sort="1.02"><b>+1.02%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.2">+0.20%</td><td class="green" data-sort="-0.16">-0.16%</td><td class="green" data-sort="-0.99">-0.99%</td><td class="green" data-sort="-1.24">-1.24%</td><td class="red" data-sort="1.7">+1.70%</td><td class="red" data-sort="1.8">+1.80%</td><td class="green" data-sort="-0.29">-0.29%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">012043</td>
+            <td class="name">
+                <div class="name-text">鹏华酒C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.4111</td>
+            <td>0.4079</td>
+            <td class="green" data-sort="-0.77"><b>-0.77%</b></td>
+            <td class="green" data-sort="-0.27"><b>-0.27%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.21">+3.21%</td><td class="green" data-sort="-1.44">-1.44%</td><td class="green" data-sort="-0.12">-0.12%</td><td class="green" data-sort="-2.46">-2.46%</td><td class="red" data-sort="1.07">+1.07%</td><td class="red" data-sort="0.15">+0.15%</td><td class="green" data-sort="-0.68">-0.68%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001553</td>
+            <td class="name">
+                <div class="name-text">天弘中证证券保险C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.0230</td>
+            <td>1.0154</td>
+            <td class="green" data-sort="-0.74"><b>-0.74%</b></td>
+            <td class="green" data-sort="-4.36"><b>-4.36%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-1.47">-1.47%</td><td class="red" data-sort="1.55">+1.55%</td><td class="green" data-sort="-0.96">-0.96%</td><td class="green" data-sort="-2.59">-2.59%</td><td class="red" data-sort="0.7">+0.70%</td><td class="red" data-sort="0.51">+0.51%</td><td class="green" data-sort="-2.1">-2.10%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">519915</td>
+            <td class="name">
+                <div class="name-text">富国消费主题混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.7680</td>
+            <td>1.7552</td>
+            <td class="green" data-sort="-0.72"><b>-0.72%</b></td>
+            <td class="green" data-sort="-1.39"><b>-1.39%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="0.74">+0.74%</td><td class="black" data-sort="0.0">+0.00%</td><td class="green" data-sort="-0.57">-0.57%</td><td class="green" data-sort="-2.05">-2.05%</td><td class="green" data-sort="-0.17">-0.17%</td><td class="red" data-sort="0.33">+0.33%</td><td class="red" data-sort="0.33">+0.33%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">012414</td>
+            <td class="name">
+                <div class="name-text">招商中证白酒指数(LOF)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.5106</td>
+            <td>0.5047</td>
+            <td class="green" data-sort="-1.16"><b>-1.16%</b></td>
+            <td class="green" data-sort="-0.29"><b>-0.29%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.47">+3.47%</td><td class="green" data-sort="-1.46">-1.46%</td><td class="green" data-sort="-0.02">-0.02%</td><td class="green" data-sort="-2.74">-2.74%</td><td class="red" data-sort="1.1">+1.10%</td><td class="red" data-sort="0.16">+0.16%</td><td class="green" data-sort="-0.8">-0.80%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">161725</td>
+            <td class="name">
+                <div class="name-text">招商中证白酒指数(LOF)A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.5131</td>
+            <td>0.5071</td>
+            <td class="green" data-sort="-1.16"><b>-1.16%</b></td>
+            <td class="green" data-sort="-0.29"><b>-0.29%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.47">+3.47%</td><td class="green" data-sort="-1.47">-1.47%</td><td class="green" data-sort="-0.02">-0.02%</td><td class="green" data-sort="-2.74">-2.74%</td><td class="red" data-sort="1.11">+1.11%</td><td class="red" data-sort="0.16">+0.16%</td><td class="green" data-sort="-0.8">-0.80%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">501058</td>
+            <td class="name">
+                <div class="name-text">汇添富中证新能源汽车产业指数(LOF)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.1879</td>
+            <td>2.0956</td>
+            <td class="green" data-sort="-4.22"><b>-4.22%</b></td>
+            <td class="green" data-sort="-10.56"><b>-10.56%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.22">-2.22%</td><td class="green" data-sort="-0.49">-0.49%</td><td class="green" data-sort="-5.06">-5.06%</td><td class="green" data-sort="-1.02">-1.02%</td><td class="green" data-sort="-2.32">-2.32%</td><td class="red" data-sort="1.29">+1.29%</td><td class="green" data-sort="-0.74">-0.74%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">013128</td>
+            <td class="name">
+                <div class="name-text">汇添富恒生科技ETF联接发起式(QDII)C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>0.7385</td>
+            <td>0.7318</td>
+            <td class="green" data-sort="-0.91"><b>-0.91%</b></td>
+            <td class="red" data-sort="5.23"><b>+5.23%</b></td>
+            <td class="time">2026-07-13 16:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-0.23">-0.23%</td><td class="red" data-sort="0.03">+0.03%</td><td class="red" data-sort="4.7">+4.70%</td><td class="green" data-sort="-0.72">-0.72%</td><td class="red" data-sort="0.92">+0.92%</td><td class="red" data-sort="0.87">+0.87%</td><td class="green" data-sort="-0.34">-0.34%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001717</td>
+            <td class="name">
+                <div class="name-text">工银前沿医疗股票A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.4050</td>
+            <td>3.3579</td>
+            <td class="green" data-sort="-1.38"><b>-1.38%</b></td>
+            <td class="red" data-sort="3.0"><b>+3.00%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.65">+2.65%</td><td class="red" data-sort="3.11">+3.11%</td><td class="green" data-sort="-2.66">-2.66%</td><td class="green" data-sort="-4.48">-4.48%</td><td class="green" data-sort="-0.6">-0.60%</td><td class="red" data-sort="2.87">+2.87%</td><td class="red" data-sort="2.11">+2.11%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">010685</td>
+            <td class="name">
+                <div class="name-text">工银前沿医疗股票C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>3.2930</td>
+            <td>3.2474</td>
+            <td class="green" data-sort="-1.38"><b>-1.38%</b></td>
+            <td class="red" data-sort="2.96"><b>+2.96%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="2.65">+2.65%</td><td class="red" data-sort="3.08">+3.08%</td><td class="green" data-sort="-2.66">-2.66%</td><td class="green" data-sort="-4.51">-4.51%</td><td class="green" data-sort="-0.59">-0.59%</td><td class="red" data-sort="2.87">+2.87%</td><td class="red" data-sort="2.12">+2.12%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">018380</td>
+            <td class="name">
+                <div class="name-text">万家储能电池ETF联接C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.1291</td>
+            <td>1.0854</td>
+            <td class="green" data-sort="-3.87"><b>-3.87%</b></td>
+            <td class="green" data-sort="-10.83"><b>-10.83%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-2.44">-2.44%</td><td class="green" data-sort="-0.1">-0.10%</td><td class="green" data-sort="-4.36">-4.36%</td><td class="green" data-sort="-1.08">-1.08%</td><td class="green" data-sort="-2.55">-2.55%</td><td class="red" data-sort="0.78">+0.78%</td><td class="green" data-sort="-1.08">-1.08%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">021760</td>
+            <td class="name">
+                <div class="name-text">中欧中证港股通创新药指数发起C</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>1.3218</td>
+            <td>1.3161</td>
+            <td class="green" data-sort="-0.43"><b>-0.43%</b></td>
+            <td class="red" data-sort="9.69"><b>+9.69%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="red" data-sort="3.05">+3.05%</td><td class="red" data-sort="0.12">+0.12%</td><td class="green" data-sort="-1.3">-1.30%</td><td class="green" data-sort="-3.49">-3.49%</td><td class="red" data-sort="2.2">+2.20%</td><td class="red" data-sort="4.54">+4.54%</td><td class="red" data-sort="4.57">+4.57%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">012863</td>
+            <td class="name">
+                <div class="name-text">汇添富中证电池主题ETF发起式联接C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>300.00元</b> <span class='shares'>(408.05份)</span> <span class='nav'>@净值0.7352</span></div>
+            </td>
+            <td>0.7352</td>
+            <td>0.7024</td>
+            <td class="green" data-sort="-4.46"><b>-4.46%</b></td>
+            <td class="green" data-sort="-12.84"><b>-12.84%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="300.0">300.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-3.44">-3.44%</td><td class="green" data-sort="-0.01">-0.01%</td><td class="green" data-sort="-5.26">-5.26%</td><td class="green" data-sort="-0.85">-0.85%</td><td class="green" data-sort="-2.02">-2.02%</td><td class="red" data-sort="0.64">+0.64%</td><td class="green" data-sort="-1.9">-1.90%</td>
+        </tr>
+        
+        <tr >
+            <td class="code">001156</td>
+            <td class="name">
+                <div class="name-text">申万菱信新能源汽车主题灵活配置混合A</div>
+                <div class="trade-badges"></div>
+                
+            </td>
+            <td>2.5490</td>
+            <td>2.4439</td>
+            <td class="green" data-sort="-4.12"><b>-4.12%</b></td>
+            <td class="green" data-sort="-18.01"><b>-18.01%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.46">-4.46%</td><td class="green" data-sort="-3.26">-3.26%</td><td class="green" data-sort="-6.98">-6.98%</td><td class="red" data-sort="0.41">+0.41%</td><td class="green" data-sort="-1.2">-1.20%</td><td class="green" data-sort="-1.48">-1.48%</td><td class="green" data-sort="-1.04">-1.04%</td>
+        </tr>
+        
+        <tr class="has-trade">
+            <td class="code">022739</td>
+            <td class="name">
+                <div class="name-text">申万菱信新能源汽车主题灵活配置混合C</div>
+                <div class="trade-badges"><span class="trade-badge buy">买</span></div>
+                <div class="trade-line buy-line">买入 <b>150.00元</b> <span class='shares'>(57.10份)</span> <span class='nav'>@净值2.5100</span></div>
+            </td>
+            <td>2.5100</td>
+            <td>2.4065</td>
+            <td class="green" data-sort="-4.12"><b>-4.12%</b></td>
+            <td class="green" data-sort="-18.02"><b>-18.02%</b></td>
+            <td class="time">2026-07-13 15:00</td>
+            <td class="sort-col" data-sort="150.0">150.00</td>
+            <td class="sort-col" data-sort="0">0.00</td>
+            <td class="green" data-sort="-4.45">-4.45%</td><td class="green" data-sort="-3.24">-3.24%</td><td class="green" data-sort="-7.02">-7.02%</td><td class="red" data-sort="0.41">+0.41%</td><td class="green" data-sort="-1.19">-1.19%</td><td class="green" data-sort="-1.47">-1.47%</td><td class="green" data-sort="-1.06">-1.06%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    <div class="summary">
+        共 124 只基金 | 黄色高亮 = 有交易记录 | 点击表头或上方按钮可排序
+    </div>
+
+    <script>
+        function sortTable(colIndex, order) {
+            const table = document.getElementById("fundTable");
+            const tbody = table.querySelector("tbody");
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                const aCell = a.cells[colIndex];
+                const bCell = b.cells[colIndex];
+
+                if (aCell.hasAttribute("data-sort") && bCell.hasAttribute("data-sort")) {
+                    aVal = parseFloat(aCell.getAttribute("data-sort"));
+                    bVal = parseFloat(bCell.getAttribute("data-sort"));
+                } else {
+                    aVal = aCell.textContent.trim();
+                    bVal = bCell.textContent.trim();
+                    const aNum = parseFloat(aVal);
+                    const bNum = parseFloat(bVal);
+                    if (!isNaN(aNum) && !isNaN(bNum)) {
+                        aVal = aNum;
+                        bVal = bNum;
+                    }
+                }
+
+                if (aVal < bVal) return order === 'asc' ? -1 : 1;
+                if (aVal > bVal) return order === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+            localStorage.setItem("fundSortCol", colIndex);
+            localStorage.setItem("fundSortOrder", order);
+        }
+
+        (function() {
+            const col = localStorage.getItem("fundSortCol");
+            const order = localStorage.getItem("fundSortOrder");
+            if (col !== null && order !== null) {
+                sortTable(parseInt(col), order);
+            }
+        })();
+
+        // ==== 自动刷新（JS 版，比 meta refresh 可靠）====
+        // 每 20 秒重新加载页面；带倒计时便于确认刷新是否生效
+        (function() {
+            var remaining = 20;
+            var el = document.getElementById("refresh-countdown");
+            var timer = setInterval(function() {
+                remaining -= 1;
+                if (el) el.textContent = remaining;
+                if (remaining <= 0) {
+                    clearInterval(timer);
+                    // 用时间戳做 hash 触发彻底重载，避免浏览器用缓存
+                    location.reload();
+                }
+            }, 1000);
+        })();
+    </script>
+</body>
+</html>
