@@ -13,7 +13,7 @@ import sys
 import pandas as pd
 import warnings
 from io import StringIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -791,7 +791,7 @@ def generate_html(data_list, trades_by_code):
 <body>
     <h2>基金实时估值 Dashboard</h2>
     <div class="info">
-        更新时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | 
+        更新时间：{bj_now()} | 
         <span id="refresh-countdown">{INTERVAL_SECONDS}</span> 秒后自动刷新
     </div>
     {stats_html}
@@ -893,6 +893,11 @@ def generate_html(data_list, trades_by_code):
 
 def now():
     return datetime.now().strftime("%H:%M:%S")
+
+
+def bj_now():
+    """返回北京时间(UTC+8)，不受运行机器时区影响，云端与本地一致。"""
+    return (datetime.now(timezone.utc) + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def update_dashboard():
