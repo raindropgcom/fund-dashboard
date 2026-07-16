@@ -802,7 +802,7 @@ def generate_html(data_list, trades_by_code):
         <button onclick="sortTable(5, 'asc')">7日合计 ↑</button>
         <button class="buy-sort" onclick="sortTable(7, 'desc')">买入金额 ↓</button>
         <button class="sell-sort" onclick="sortTable(8, 'desc')">卖出金额 ↓</button>
-        <button onclick="location.reload()">刷新数据</button>
+        <button onclick="var b=location.href.split('?')[0];location.href=b+'?t='+Date.now();">刷新数据</button>
     </div>
     <table id="fundTable">
         <thead>
@@ -880,8 +880,9 @@ def generate_html(data_list, trades_by_code):
                 if (el) el.textContent = remaining;
                 if (remaining <= 0) {{
                     clearInterval(timer);
-                    // 用时间戳做 hash 触发彻底重载，避免浏览器用缓存
-                    location.reload();
+                    // file:// 下 location.reload() 可能用缓存，改为带时间戳的 URL 强制重读磁盘文件
+                    var base = location.href.split('?')[0];
+                    location.href = base + '?t=' + Date.now();
                 }}
             }}, 1000);
         }})();
