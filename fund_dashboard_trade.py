@@ -983,6 +983,15 @@ def main():
     print(f"[{now()}] 请用浏览器打开: {OUTPUT_HTML}")
     print("按 Ctrl+C 停止\n")
 
+    # 默认模式（无 --once/--service）：无限常驻，直到 Ctrl+C 才退出，
+    # 保证 HTML 持续刷新（修复"双击 bat 后文件不再更新"的问题）。
+    try:
+        while True:
+            time.sleep(3600)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
+        print(f"[{now()}] 已停止")
+
     try:
         while True:
             time.sleep(1)
