@@ -1,6 +1,8 @@
 name: Update Fund Dashboard
 
 on:
+  push:                # 推送 main 即自动重新生成并部署，避免“push 了网页却没更新”
+    branches: [main]
   schedule:
     # 北京时间 9:00–15:59 工作日（UTC+8 → UTC 1-7），覆盖盘中估值 + 盘后净值更新
     # 已收紧到交易时段，私有仓库也能在免费额度(2000分钟/月)内跑完
