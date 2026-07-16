@@ -24,6 +24,7 @@ _BASE = os.path.dirname(os.path.abspath(__file__))
 CODE_FILE = os.path.join(_BASE, "fund_code", "fund_codes.txt")
 TRADE_DIR = os.path.join(_BASE, "trades")
 OUTPUT_HTML = os.path.join(_BASE, "fund_code", "fund_dashboard.html")
+CACHE_FILE = os.path.join(_BASE, "fund_code", ".fund_cache.json")
 INTERVAL_SECONDS = 20
 MAX_WORKERS = 10
 REQUEST_TIMEOUT = 15
@@ -41,6 +42,45 @@ cached_hist_date = None
 cached_trades = {}
 # 上次抓取历史净值的时间，用于控制历史列按周期刷新
 last_hist_fetch = None
+# 数据兜底与状态：进程重启/接口故障时不致全空白
+last_success_bj = None  # 最近一次"至少部分基金抓取成功"的北京时间
+last_fetch_status = {"live_ok": 0, "live_total": 0, "hist_ok": 0}
+
+
+def load_cache():
+    """启动时从磁盘读取上一次成功的数据，作为兜底：
+    防止进程重启 / 接口临时故障 / 网络抖动导致页面变成一片空白。
+    只要曾经成功过一次，就永远有旧数据可显示，并在页面标注'数据停留在 X'。"""
+    global cached_data, cached_hist_data, cached_trades, last_success_bj
+    try:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                blob = json.load(f)
+            cached_data = blob.get("cached_data", {}) or {}
+            cached_hist_data = blob.get("cached_hist_data", {}) or {}
+            cached_trades = blob.get("cached_trades", {}) or {}
+            last_success_bj = blob.get("last_success_bj")
+            print(f"[{now()}] 已从磁盘缓存恢复兜底数据: {len(cached_data)} 只基金")
+    except Exception as e:
+        print(f"[{now()}] 读取缓存失败(忽略): {e}")
+
+
+def save_cache():
+    """把当前已抓取到的数据持久化到磁盘，供下次兜底。原子写入(先写临时文件再替换)。"""
+    global cached_data, cached_hist_data, cached_trades, last_success_bj
+    try:
+        blob = {
+            "cached_data": cached_data,
+            "cached_hist_data": cached_hist_data,
+            "cached_trades": cached_trades,
+            "last_success_bj": last_success_bj,
+        }
+        tmp = CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(blob, f, ensure_ascii=False, default=str)
+        os.replace(tmp, CACHE_FILE)
+    except Exception as e:
+        print(f"[{now()}] 写入缓存失败(忽略): {e}")
 
 
 def read_fund_codes(filepath):
@@ -259,37 +299,36 @@ def fetch_live_valuation(fund_code):
 
 
 def fetch_history_7days(fund_code):
+    """抓取前 HISTORY_DAYS 个交易日的每日涨跌幅与合计。
+    注：东方财富旧的 F10DataApi.aspx 接口已失效（仅返回空壳 'var apidata='），
+    现改用 api.fund.eastmoney.com/f10/lsjz 的 JSON 接口。"""
     code = str(fund_code).strip().zfill(6)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": f"http://fund.eastmoney.com/f10/jjjz_{code}.html"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+        "Referer": "https://fundf10.eastmoney.com/"
     }
     for attempt in range(FETCH_RETRIES):
         try:
-            url = f"http://fund.eastmoney.com/f10/F10DataApi.aspx?type=lsjz&code={code}&page=1&per={HISTORY_DAYS}"
+            url = f"https://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize={HISTORY_DAYS}"
             resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             if resp.status_code == 200:
-                match = re.search(r'content:"(.*?)"\s*,\s*records:', resp.text, re.DOTALL)
-                if match:
-                    html = match.group(1).replace('\\"', '"').replace('\\/', '/')
-                    try:
-                        tables = pd.read_html(StringIO(html))
-                        if tables and len(tables[0]) > 0:
-                            df_hist = tables[0]
-                            records = []
-                            total = 0.0
-                            for _, row in df_hist.iterrows():
-                                date = str(row.iloc[0])
-                                rate_str = str(row.iloc[3]) if len(row) > 3 else "0%"
-                                try:
-                                    rate_val = float(rate_str.replace('%', '').replace('---', '0'))
-                                except:
-                                    rate_val = 0.0
-                                records.append({"date": date, "rate": rate_val})
-                                total += rate_val
-                            return records, round(total, 2)
-                    except Exception:
-                        pass
+                try:
+                    d = resp.json()
+                    lst = d.get("Data", {}).get("LSJZList", [])
+                    if lst:
+                        records = []
+                        total = 0.0
+                        for it in lst:
+                            date = str(it.get("FSRQ", ""))
+                            try:
+                                rate_val = float(it.get("JZZZL", 0) or 0)
+                            except Exception:
+                                rate_val = 0.0
+                            records.append({"date": date, "rate": rate_val})
+                            total += rate_val
+                        return records, round(total, 2)
+                except Exception:
+                    pass
         except Exception:
             pass
         if attempt < FETCH_RETRIES - 1:
@@ -358,6 +397,7 @@ def fetch_all_data(fund_codes):
                 "dwjz": live.get("dwjz", ""),
                 "gztime": live.get("gztime", ""),
             })
+            live["fresh"] = True  # 标记本次为实时成功抓取（区别于旧缓存兜底）
         elif code in cached_data:
             live = cached_data[code]
             live_cached += 1
@@ -383,6 +423,7 @@ def fetch_all_data(fund_codes):
             "gztime": live.get("gztime", ""),
             "history": hist[0],
             "total_7d": hist[1],
+            "fresh": live.get("fresh", False),
         }
 
     print(f"[{now()}] 完成: 新估值{live_new}只 缓存估值{live_cached}只 耗时{elapsed:.1f}s")
@@ -391,7 +432,22 @@ def fetch_all_data(fund_codes):
 
 # ==================== HTML生成（带买入/卖出排序）====================
 
-def generate_html(data_list, trades_by_code):
+def generate_html(data_list, trades_by_code, status=None):
+    # 根据抓取状态计算页面顶部徽章（让用户一眼判断数据是否可信）
+    if status:
+        live_ok = status.get("live_ok", 0)
+        live_total = status.get("live_total", 0)
+        if live_total > 0 and live_ok == live_total:
+            badge_cls, badge_text = "ok", "数据正常"
+        elif live_ok > 0:
+            badge_cls, badge_text = "warn", f"部分数据来自缓存 ({live_ok}/{live_total})"
+        else:
+            badge_cls, badge_text = "err", "抓取异常·数据停留在缓存"
+        last_succ = status.get("last_success_bj") or last_success_bj
+    else:
+        badge_cls, badge_text = "ok", "数据正常"
+        last_succ = last_success_bj
+
     date_cols = []
     if data_list and data_list[0]["history"]:
         date_cols = [h["date"] for h in data_list[0]["history"]]
@@ -786,6 +842,23 @@ def generate_html(data_list, trades_by_code):
             font-size: 14px;
             color: #34495e;
         }}
+        .status-badge {{
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 12px;
+            font-weight: bold;
+        }}
+        .status-ok {{ background: #d5f5e3; color: #1e8449; }}
+        .status-warn {{ background: #fdebd0; color: #b9770e; }}
+        .status-err {{ background: #fadbd8; color: #c0392b; }}
+        .last-succ {{
+            display: inline-block;
+            margin-left: 12px;
+            color: #95a5a6;
+            font-size: 12px;
+        }}
     </style>
 </head>
 <body>
@@ -793,6 +866,8 @@ def generate_html(data_list, trades_by_code):
     <div class="info">
         更新时间：{bj_now()} | 
         <span id="refresh-countdown">{INTERVAL_SECONDS}</span> 秒后自动刷新
+        <span class="status-badge status-{badge_cls}">{badge_text}</span>
+        <span class="last-succ">数据最后成功更新：{last_succ or '—'}</span>
     </div>
     {stats_html}
     <div class="controls">
@@ -902,28 +977,45 @@ def bj_now():
 
 
 def update_dashboard():
-    fund_codes = read_fund_codes(CODE_FILE)
-    if not fund_codes:
-        print(f"[{now()}] 未读取到有效基金代码")
-        return
+    global last_success_bj, last_fetch_status
+    try:
+        fund_codes = read_fund_codes(CODE_FILE)
+        if not fund_codes:
+            print(f"[{now()}] 未读取到有效基金代码")
+            return
 
-    global cached_trades
-    cached_trades = load_all_trades(TRADE_DIR)
+        global cached_trades
+        cached_trades = load_all_trades(TRADE_DIR)
 
-    data = fetch_all_data(fund_codes)
+        data = fetch_all_data(fund_codes)
 
-    data_list = []
-    for code in fund_codes:
-        data_list.append(data.get(code, {
-            "fundcode": code, "name": "", "gsz": "", "gszzl": "",
-            "dwjz": "", "gztime": "", "history": [], "total_7d": None,
-        }))
+        data_list = []
+        for code in fund_codes:
+            data_list.append(data.get(code, {
+                "fundcode": code, "name": "", "gsz": "", "gszzl": "",
+                "dwjz": "", "gztime": "", "history": [], "total_7d": None,
+            }))
 
-    html_content = generate_html(data_list, cached_trades)
-    with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        # 统计本次抓取成功率，用于页面状态提示（让用户一眼判断数据可信度）
+        live_ok = sum(1 for d in data_list if d.get("fresh"))
+        hist_ok = sum(1 for d in data_list if d.get("history"))
+        total = len(data_list)
+        if live_ok > 0:
+            last_success_bj = bj_now()  # 任一部分成功即视为"成功更新"
+        last_fetch_status = {"live_ok": live_ok, "live_total": total, "hist_ok": hist_ok}
 
-    print(f"[{now()}] Dashboard已更新: {OUTPUT_HTML}")
+        html_content = generate_html(data_list, cached_trades, status=last_fetch_status)
+        with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        # 抓取成功（至少有部分数据）才持久化兜底缓存
+        if live_ok > 0:
+            save_cache()
+
+        print(f"[{now()}] Dashboard已更新: {OUTPUT_HTML} | 实时 {live_ok}/{total} 历史 {hist_ok}/{total}")
+    except Exception as e:
+        # 防崩：单次更新出错不影响常驻进程，下一轮继续重试
+        print(f"[{now()}] 更新出错(进程继续存活): {e}")
 
 
 def main():
@@ -946,6 +1038,7 @@ def main():
         print("请将天天基金交易记录Excel放入此目录后重新运行")
         return
 
+    load_cache()
     update_dashboard()
 
     # 单次模式（--once）：供 GitHub Actions 调用，生成一次后立即退出，不启动常驻定时器
